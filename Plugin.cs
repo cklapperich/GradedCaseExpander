@@ -45,7 +45,7 @@ namespace GradedCardExpander
         {
             if (!File.Exists(_configFilePath))
             {
-                Plugin.Logger.LogWarning($"GradedCardCase.txt file does not exist: {_configFilePath}");
+                Plugin.Logger.LogWarning($"DefaultLabel.txt file does not exist: {_configFilePath}");
                 return;
             }
 
@@ -79,7 +79,7 @@ namespace GradedCardExpander
             Logger = base.Logger;
             PluginPath = Path.GetDirectoryName(Info.Location);
 
-            string gradedCardCaseFile = Path.Combine(PluginPath, "GradedCardCase.txt");
+            string gradedCardCaseFile = Path.Combine(PluginPath, "DefaultLabel.txt");
             GradedConfig.Initialize(gradedCardCaseFile);
 
             LoadGradeSpecificAssets();
@@ -90,8 +90,8 @@ namespace GradedCardExpander
 
         private void LoadGradeSpecificAssets()
         {
-            // Load fallback assets first (GradedCardCase.png and GradedCardCase.txt)
-            LoadGradeAssets(0, "GradedCardCase");
+            // Load fallback assets first (DefaultLabel.png and DefaultLabel.txt)
+            LoadGradeAssets(0, "DefaultLabel");
 
             // Load grade-specific sprites (1.png to 10.png)
             for (int grade = 1; grade <= 10; grade++)
