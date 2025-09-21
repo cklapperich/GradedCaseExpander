@@ -21,10 +21,11 @@ This guide documents the complete graded card customization system for Card Shop
 ### Complete System Architecture
 
 **3D Mesh Components** (Card3dUIGroup.m_GradedCardGrp):
-- `CardBackMeshBlocker` - Renders card back texture that interferes with graded case display (must be disabled)
+- `CardBackMeshBlocker` - Renders card back texture that interferes with graded case display (texture replaced with transparent)
   - **Material**: `MAT_CardBackMesh (Instance)`
-  - **Texture**: `T_CardBackMesh` (ID:1306 in sharedassets1.assets)
+  - **Texture**: `T_CardBackMesh` (confirmed via logging - not CardBack.png as initially assumed)
   - **Problem**: Causes card back texture to render on front of graded cards
+  - **Solution**: Replace T_CardBackMesh texture with transparent 1x1 texture while keeping mesh for depth testing
 - `Slab_BaseMesh` - Physical case base layer
   - **Material**: `trading_card 1 (Instance)`
   - **Texture**: `trading_card_transparent`
@@ -147,6 +148,75 @@ OffsetY=5
 - Only applies explicitly configured values
 - Preserves original game settings for unconfigured properties
 
+## Depth Sorting Solutions
+
+The current system suffers from Z-depth sorting conflicts where 3D world objects (glass cases, other graded cards) can render behind the screen-space UI labels, causing visual artifacts.
+
+### Solution 1: LOD Distance-Based Hybrid (Acceptable Compromise)
+
+**Approach**: Replace the base `GradedCardCase.png` with a generic fallback that looks reasonable at distance, while using custom per-grade textures up close.
+
+**Implementation**:
+- Keep transparent `T_CardBackMesh` replacement (current solution)
+- Replace the original `GradedCardCase.png` asset with a neutral design
+- Custom per-grade textures render only at close distance (Unity LOD limitation)
+- At far distances, Unity renders the replaced base texture
+
+**Pros**:
+- Works with existing system
+- Acceptable visual compromise
+- No major architectural changes
+
+**Cons**:
+- Cannot achieve per-grade customization at distance
+- Still uses screen space UI with potential sorting conflicts
+
+### Solution 2: World Space Canvas
+
+**Approach**: Convert the Canvas containing `LabelImageBack` from Screen Space to World Space, allowing proper 3D depth sorting.
+
+**Implementation**:
+```csharp
+Canvas canvas = labelBack.GetComponentInParent<Canvas>();
+canvas.renderMode = RenderMode.WorldSpace;
+canvas.worldCamera = Camera.main;
+RectTransform canvasRect = canvas.GetComponent<RectTransform>();
+canvasRect.sizeDelta = new Vector2(6.15f, 1.6f); // Convert pixels to world units
+```
+
+**Pros**:
+- Natural depth sorting with all 3D objects
+- Maintains UI system benefits (text rendering, etc.)
+- Per-grade customization at all distances
+
+**Cons**:
+- Canvas becomes part of 3D scene (perspective scaling, rotation)
+- May require careful positioning and scaling adjustments
+- Text elements might need repositioning
+
+### Solution 3: 3D Quad Replacement
+
+**Approach**: Replace the UI Image system entirely with 3D quad meshes and 3D text objects.
+
+**Implementation**:
+- Create 3D quad mesh with custom texture material
+- Replace TextMeshProUGUI with 3D TextMeshPro objects
+- Position all elements in world space relative to card
+
+**Pros**:
+- Perfect depth sorting (fully 3D)
+- Can use advanced shaders and effects
+- Complete control over rendering pipeline
+
+**Cons**:
+- Most complex implementation
+- Need to recreate text positioning system
+- Requires managing 3D text objects
+
+### Recommended Approach
+
+Start with **Solution 2 (World Space Canvas)** as it provides the best balance of proper depth sorting while maintaining the existing UI text system.
+
 ## Troubleshooting
 
 ### Common Issues
@@ -263,3 +333,113 @@ Create unique looks for each grade:
 - `CardBackMeshBlocker` = Actually prevents card back from showing through
 
 This investigation demonstrates how initial assumptions about system architecture can be misleading, and the importance of runtime inspection over static analysis when dealing with complex Unity systems.
+
+## UI Component Architecture Analysis
+
+### The Unified vs Component-Based Design Conflict
+
+**Base Game Design**: The original game uses `GradedCardCase.png` as a **unified texture** that contains all visual elements in one cohesive image:
+- Background styling
+- Company branding
+- Text positioning guides
+- All visual elements integrated
+
+**Modded Approach**: The current mod works with **individual UI components**, replacing only `LabelImageBack` while leaving other components in unknown states.
+
+### Component Status Investigation
+
+**`LabelImageBack`**:
+- **Status**: Active and visible (renders the 32x32 WhiteTile stretched to 615x160)
+- **Original Content**: Black rectangle in vanilla game
+- **Mod Behavior**: Successfully replaced with custom textures
+
+**`LabelImage`**:
+- **Status**: Hidden/unused (confirmed - no interference when ignored)
+- **Purpose**: Unknown - misleading naming suggests it should be the main label
+- **Theory**: Legacy component from earlier UI design iteration
+
+**`LabelImageCompany`**:
+- **Status**: Hidden/unused (confirmed - no interference when ignored)
+- **Purpose**: Originally intended for company branding overlay
+- **Color**: Red (as documented, but not visible in practice)
+- **Theory**: Unused in current unified texture approach
+
+### Architecture Mismatch Theory
+
+The layering/sorting issues stem from a fundamental architecture mismatch:
+
+1. **Original Pipeline**: Unity renders `GradedCardCase.png` as a complete texture with proper depth sorting
+2. **Modded Pipeline**: Unity renders individual UI components that were never designed to be part of the active rendering pipeline
+3. **Sorting Conflict**: The UI components (`LabelImageBack`) don't inherit the same depth/sorting rules as the unified texture system
+
+**Key Insight**: The individual UI components (`LabelImage`, `LabelImageBack`, `LabelImageCompany`) appear to be **artifacts from an earlier component-based design** that was later replaced with the unified `GradedCardCase.png` approach, but the unused components were never removed from the scene hierarchy.
+
+### Implications for Fan/Overlap Rendering
+
+When graded cards are fanned out in hand:
+- **Base Game**: `GradedCardCase.png` textures follow the game's existing card depth sorting
+- **Modded**: `LabelImageBack` UI components may not respect the same sorting rules because they were never part of the intended rendering pipeline
+
+This explains why the base game works perfectly while the modded approach has layering issues - we're using UI components that were never meant to be visible or part of the depth sorting system.
+
+## Implementation Approaches: UI vs Material Replacement
+
+### UI Image Replacement Approach (Original Implementation)
+
+**Target**: `LabelImageBack` UI Image component in the Canvas system
+**Original State**:
+- Displays a 32x32 `WhiteTile` sprite stretched to 615x160 pixels
+- Appears as a black rectangle in vanilla game
+- Part of screen-space UI rendering pipeline
+
+**Modification Method**:
+```csharp
+labelBack.sprite = Plugin.GradeSprites[grade]; // Replace sprite on UI component
+```
+
+**Asset Type**: Custom PNG files loaded as Unity Sprite objects
+**Advantages**:
+- Simple implementation
+- Works with existing UI text system
+- Clear visual results
+
+**Disadvantages**:
+- **Incorrect depth sorting** when cards overlap/fan out
+- UI components not part of original rendering pipeline
+- Screen-space rendering conflicts with 3D world objects
+
+### Material Texture Replacement Approach (New Implementation)
+
+**Target**: `Slab_BaseMesh` 3D mesh material texture
+**Original State**:
+- Material: `trading_card 1 (Instance)`
+- Texture: `trading_card_transparent`
+- Part of 3D world rendering pipeline
+
+**Modification Method**:
+```csharp
+material.mainTexture = Plugin.GradeTextures[grade]; // Replace texture on 3D material
+```
+
+**Asset Type**: Custom PNG files loaded as Unity Texture2D objects
+**Advantages**:
+- **Proper depth sorting** - works within 3D rendering pipeline
+- Respects game's existing card layering logic
+- Compatible with fanned card displays
+
+**Disadvantages**:
+- More complex to integrate with text overlays
+- May require different texture specifications
+- Need to handle UI transparency separately
+
+### Migration Strategy
+
+**Phase 1**: Switch to material replacement for proper sorting
+**Phase 2**: Maintain UI transparency to avoid conflicts
+**Phase 3**: Ensure text rendering works correctly over 3D textures
+
+**Key Change**:
+- **Old**: `Plugin.GradeSprites` (Dictionary<int, Sprite>)
+- **New**: `Plugin.GradeTextures` (Dictionary<int, Texture2D>)
+
+**Hybrid Approach**: Use 3D material textures for background while keeping UI text elements, with UI images set to transparent to avoid conflicts.

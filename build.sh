@@ -121,4 +121,21 @@ else
     exit 1
 fi
 
+# Move log file if it exists
+echo "[INFO] Checking for BepInEx log file..."
+BEPINEX_LOG="$STEAM_GAME_DIR/BepInEx/LogOutput.log"
+LOCAL_LOG="$SCRIPT_DIR/LogOutput.log"
+
+if [ -f "$BEPINEX_LOG" ]; then
+    echo "[INFO] Found BepInEx log file, moving to local directory..."
+    mv "$BEPINEX_LOG" "$LOCAL_LOG"
+    if [ $? -eq 0 ]; then
+        echo "[INFO] Log file moved to: $LOCAL_LOG"
+    else
+        echo "[WARNING] Failed to move log file"
+    fi
+else
+    echo "[INFO] No BepInEx log file found at: $BEPINEX_LOG"
+fi
+
 echo "[SUCCESS] Build complete!"
