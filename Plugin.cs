@@ -11,9 +11,9 @@ namespace GradedCardExpander
 {
     public class GradedCardTextConfig
     {
-        public Color Color { get; set; } = Color.white;
-        public float FontSize { get; set; } = 16f;
-        public Vector2 Position { get; set; } = Vector2.zero;
+        public Color? Color { get; set; } = null;
+        public float? FontSize { get; set; } = null;
+        public Vector2? Position { get; set; } = null;
     }
 
     public class GradedCardGradeConfig
@@ -49,14 +49,96 @@ namespace GradedCardExpander
                 return;
             }
 
-            try
+            // Note: LoadTextConfig moved to Plugin class for grade-specific loading
+            Plugin.Logger.LogInfo($"Loaded graded card text config from: {_configFilePath}");
+        }
+    }
+
+    public static class MyPluginInfo
+    {
+        public const string PLUGIN_GUID ="com.snowbloom.cardshopsim.gradedcardcaseexpander";
+        public const string PLUGIN_NAME = "GradedCardCaseExpander";
+        public const string PLUGIN_VERSION = "1.0.0";
+    }
+
+    [BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
+    [BepInProcess("Card Shop Simulator.exe")]
+    [BepInDependency("shaklin.TextureReplacer", BepInDependency.DependencyFlags.SoftDependency)]
+    public class Plugin : BaseUnityPlugin
+    {
+        internal static new ManualLogSource Logger;
+        internal static string PluginPath;
+        internal static GradedCardConfig GradedConfig = new GradedCardConfig();
+        internal static Dictionary<int, Sprite> GradeSprites = new Dictionary<int, Sprite>();
+        internal static Dictionary<int, GradedCardGradeConfig> GradeConfigs = new Dictionary<int, GradedCardGradeConfig>();
+
+        private readonly Harmony harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
+
+        private void Awake()
+        {
+            Logger = base.Logger;
+            PluginPath = Path.GetDirectoryName(Info.Location);
+
+            string gradedCardCaseFile = Path.Combine(PluginPath, "GradedCardCase.txt");
+            GradedConfig.Initialize(gradedCardCaseFile);
+
+            LoadGradeSpecificAssets();
+
+            harmony.PatchAll();
+            Logger.LogInfo("GradedCardCaseExpander loaded successfully!");
+        }
+
+        private void LoadGradeSpecificAssets()
+        {
+            // Load fallback assets first (GradedCardCase.png and GradedCardCase.txt)
+            LoadGradeAssets(0, "GradedCardCase");
+
+            // Load grade-specific sprites (1.png to 10.png)
+            for (int grade = 1; grade <= 10; grade++)
             {
-                LoadTextConfig(_configFilePath, _defaultConfig);
-                Plugin.Logger.LogInfo($"Loaded graded card text config from: {_configFilePath}");
+                LoadGradeAssets(grade, grade.ToString());
             }
-            catch (Exception ex)
+
+            Logger.LogInfo($"Loaded {GradeSprites.Count} grade sprites and {GradeConfigs.Count} grade configs");
+        }
+
+        private void LoadGradeAssets(int gradeKey, string baseName)
+        {
+            // Load sprite
+            string imagePath = Path.Combine(PluginPath, $"{baseName}.png");
+            if (File.Exists(imagePath))
             {
-                Plugin.Logger.LogError($"Failed to load text config: {ex.Message}");
+                try
+                {
+                    byte[] imageData = File.ReadAllBytes(imagePath);
+                    Texture2D texture = new Texture2D(2, 2);
+                    texture.LoadImage(imageData);
+
+                    Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+                    GradeSprites[gradeKey] = sprite;
+                    Logger.LogInfo($"Loaded {baseName} sprite: {texture.width}x{texture.height}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Failed to load {baseName} image: {ex.Message}");
+                }
+            }
+
+            // Load config
+            string configPath = Path.Combine(PluginPath, $"{baseName}.txt");
+            if (File.Exists(configPath))
+            {
+                try
+                {
+                    var gradeConfig = new GradedCardGradeConfig();
+                    LoadTextConfig(configPath, gradeConfig);
+                    GradeConfigs[gradeKey] = gradeConfig;
+                    Logger.LogInfo($"Loaded {baseName} config from: {configPath}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Failed to load {baseName} config: {ex.Message}");
+                }
             }
         }
 
@@ -82,6 +164,7 @@ namespace GradedCardExpander
                         "GradeExpansionRarityText" => gradeConfig.GradeExpansionRarityText,
                         _ => null
                     };
+                    Logger.LogInfo($"Found section [{sectionName}] in {configFile}, valid: {currentTextConfig != null}");
                     continue;
                 }
 
@@ -99,6 +182,11 @@ namespace GradedCardExpander
                                 if (ColorUtility.TryParseHtmlString(value, out Color color))
                                 {
                                     currentTextConfig.Color = color;
+                                    Logger.LogInfo($"Loaded color {color} for current section in {configFile}");
+                                }
+                                else
+                                {
+                                    Logger.LogWarning($"Failed to parse color '{value}' in {configFile}");
                                 }
                                 break;
                             case "FontSize":
@@ -107,81 +195,25 @@ namespace GradedCardExpander
                                     currentTextConfig.FontSize = fontSize;
                                 }
                                 break;
-                            case "PositionX":
-                                if (float.TryParse(value, out float posX))
+                            case "OffsetX":
+                                if (float.TryParse(value, out float offsetX))
                                 {
-                                    currentTextConfig.Position = new Vector2(posX, currentTextConfig.Position.y);
+                                    var currentOffset = currentTextConfig.Position ?? Vector2.zero;
+                                    currentTextConfig.Position = new Vector2(offsetX, currentOffset.y);
+                                    Logger.LogInfo($"Loaded OffsetX {offsetX} for current section in {configFile}");
                                 }
                                 break;
-                            case "PositionY":
-                                if (float.TryParse(value, out float posY))
+                            case "OffsetY":
+                                if (float.TryParse(value, out float offsetY))
                                 {
-                                    currentTextConfig.Position = new Vector2(currentTextConfig.Position.x, posY);
+                                    var currentOffset = currentTextConfig.Position ?? Vector2.zero;
+                                    currentTextConfig.Position = new Vector2(currentOffset.x, offsetY);
+                                    Logger.LogInfo($"Loaded OffsetY {offsetY} for current section in {configFile}");
                                 }
                                 break;
                         }
                     }
                 }
-            }
-        }
-    }
-
-    public static class MyPluginInfo
-    {
-        public const string PLUGIN_GUID ="com.snowbloom.cardshopsim.gradedcardcaseexpander";
-        public const string PLUGIN_NAME = "GradedCardCaseExpander";
-        public const string PLUGIN_VERSION = "1.0.0";
-    }
-
-    [BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
-    [BepInProcess("Card Shop Simulator.exe")]
-    [BepInDependency("shaklin.TextureReplacer", BepInDependency.DependencyFlags.SoftDependency)]
-    public class Plugin : BaseUnityPlugin
-    {
-        internal static new ManualLogSource Logger;
-        internal static string PluginPath;
-        internal static GradedCardConfig GradedConfig = new GradedCardConfig();
-        internal static Sprite CustomLabelSprite;
-
-        private readonly Harmony harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
-
-        private void Awake()
-        {
-            Logger = base.Logger;
-            PluginPath = Path.GetDirectoryName(Info.Location);
-
-            string gradedCardCaseFile = Path.Combine(PluginPath, "GradedCardCase.txt");
-            GradedConfig.Initialize(gradedCardCaseFile);
-
-            LoadCustomLabelSprite();
-
-            harmony.PatchAll();
-            Logger.LogInfo("GradedCardCaseExpander loaded successfully!");
-        }
-
-        private void LoadCustomLabelSprite()
-        {
-            string imagePath = Path.Combine(PluginPath, "GradedCardCaseImage.png");
-
-            if (File.Exists(imagePath))
-            {
-                try
-                {
-                    byte[] imageData = File.ReadAllBytes(imagePath);
-                    Texture2D texture = new Texture2D(2, 2);
-                    texture.LoadImage(imageData);
-
-                    CustomLabelSprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
-                    Logger.LogInfo($"Loaded custom label sprite: {texture.width}x{texture.height}");
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError($"Failed to load custom label image: {ex.Message}");
-                }
-            }
-            else
-            {
-                Logger.LogInfo("No custom label image found (GradedCardCaseImage.png)");
             }
         }
     }
