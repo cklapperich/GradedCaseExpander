@@ -141,6 +141,7 @@ namespace GradedCardExpander
         internal static new ManualLogSource Logger;
         internal static string PluginPath;
         internal static GradedCardConfig GradedConfig = new GradedCardConfig();
+        internal static Sprite CustomLabelSprite;
 
         private readonly Harmony harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
 
@@ -152,8 +153,36 @@ namespace GradedCardExpander
             string gradedCardCaseFile = Path.Combine(PluginPath, "GradedCardCase.txt");
             GradedConfig.Initialize(gradedCardCaseFile);
 
+            LoadCustomLabelSprite();
+
             harmony.PatchAll();
             Logger.LogInfo("GradedCardCaseExpander loaded successfully!");
+        }
+
+        private void LoadCustomLabelSprite()
+        {
+            string imagePath = Path.Combine(PluginPath, "GradedCardCaseImage.png");
+
+            if (File.Exists(imagePath))
+            {
+                try
+                {
+                    byte[] imageData = File.ReadAllBytes(imagePath);
+                    Texture2D texture = new Texture2D(2, 2);
+                    texture.LoadImage(imageData);
+
+                    CustomLabelSprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+                    Logger.LogInfo($"Loaded custom label sprite: {texture.width}x{texture.height}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Failed to load custom label image: {ex.Message}");
+                }
+            }
+            else
+            {
+                Logger.LogInfo("No custom label image found (GradedCardCaseImage.png)");
+            }
         }
     }
 }
