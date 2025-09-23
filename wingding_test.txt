@@ -1,20 +1,21 @@
+# Test configuration file for wingding font
 [GradeNumberText]
 Color=#FF0000
-FontSize=24
+FontSize=36
 Font=wingding
 OffsetX=0
 OffsetY=0
 
 [GradeDescriptionText]
 Color=#00FF00
-FontSize=18
+FontSize=24
 Font=wingding
 OffsetX=0
 OffsetY=0
 
 [GradeNameText]
 Color=#0000FF
-FontSize=16
+FontSize=18
 Font=wingding
 OffsetX=0
 OffsetY=0
