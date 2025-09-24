@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using BepInEx.Logging;
 
 /* 
+    // this is hwo texturereplacer replaces the gradedcardcase texture. how should WE then replace it? 
     if ((Object)(object)CardCropGrading == (Object)null)
     {
         Texture2D cachedTexture = GetCachedTexture("GradedCardCase");
@@ -40,55 +41,98 @@ namespace GradedCardExpander.Patches
                 //Logger.LogInfo($"GradedCardGrp GameObject name: '{__instance.m_GradedCardGrp.name}'");
                 int grade = cardData.cardGrade;
 
-                // Apply grade-specific sprite to LabelImageBack
-                //ApplyGradeSpecificSprite(__instance, grade);
+                // Apply grade-specific sprite or fallback to DefaultLabel
+                ApplyGradeSprite(__instance, grade);
 
                 // Clear CardBackMesh to prevent black rectangle
                 //ClearCardBackMesh(__instance);
 
                 // Apply text configuration
+                Logger.LogInfo($"Looking for text config for grade {grade}");
                 if (Plugin.GradeConfigs.ContainsKey(grade))
                 {
+                    Logger.LogInfo($"Found grade {grade} config, applying...");
                     ApplyTextConfiguration(__instance, Plugin.GradeConfigs[grade]);
                 }
                 else if (Plugin.GradeConfigs.ContainsKey(0)) // Fallback to DefaultLabel.txt
                 {
+                    Logger.LogInfo($"No grade {grade} config, using DefaultLabel.txt fallback");
                     ApplyTextConfiguration(__instance, Plugin.GradeConfigs[0]);
+                }
+                else
+                {
+                    Logger.LogWarning($"No text configuration found for grade {grade} or fallback");
                 }
             }
         }
 
-        private static void ApplyGradeSpecificSprite(Card3dUIGroup instance, int grade)
+        private static void ApplyGradeSprite(Card3dUIGroup instance, int grade)
         {
-            // Find LabelImageBack UI component and apply grade-specific sprite
-            var labelBack = instance.m_GradedCardGrp?.transform.Find("LabelImageBack")?.GetComponent<Image>();
-            var labelImage = instance.m_GradedCardGrp?.transform.Find("LabelImage")?.GetComponent<Image>();
-
-            // Apply grade-specific sprite or fallback
-            if (labelImage != null)
+            // Mimic TextureReplacer's exact approach but with grade-specific sprites
+            Transform transform = instance.m_GradedCardGrp.transform;
+            if (transform != null)
             {
-                if (Plugin.GradeSprites.ContainsKey(grade))
+                Transform labelImageTransform = transform.Find("LabelImage");
+                if (labelImageTransform != null)
                 {
-                    labelImage.sprite = Plugin.GradeSprites[grade];
-                    Logger.LogInfo($"Applied grade {grade} sprite to LabelImageBack");
-                }
-                else if (Plugin.GradeSprites.ContainsKey(0)) // Fallback to DefaultLabel.png
-                {
-                    labelImage.sprite = Plugin.GradeSprites[0];
-                    Logger.LogInfo($"Applied fallback sprite (DefaultLabel.png) to LabelImageBack for grade {grade}");
-                }
-                else
-                {
-                    labelImage.enabled = false;
-                    Logger.LogWarning("No grade sprites loaded, disabling LabelImageBack");
-                    return;
-                }
+                    Image labelImageComponent = labelImageTransform.GetComponent<Image>();
+                    if (labelImageComponent != null && labelImageComponent.sprite != null)
+                    {
+                        // Try grade-specific sprite first, then fallback to DefaultLabel
+                        Sprite spriteToApply = null;
+                        string logMessage = "";
 
-                labelImage.color = Color.white;
-                labelImage.type = Image.Type.Simple;
-                labelImage.preserveAspect = false;
+                        if (Plugin.GradeSprites.ContainsKey(grade))
+                        {
+                            spriteToApply = Plugin.GradeSprites[grade];
+                            logMessage = $"Applied grade {grade} sprite to LabelImage";
+                        }
+                        else if (Plugin.DefaultLabelSprite != null)
+                        {
+                            spriteToApply = Plugin.DefaultLabelSprite;
+                            logMessage = $"Applied DefaultLabel.png fallback for grade {grade}";
+                        }
+
+                        if (spriteToApply != null)
+                        {
+                            // Copy the original sprite name like TextureReplacer does
+                            spriteToApply.name = labelImageComponent.sprite.name;
+
+                            // Replace the sprite
+                            labelImageComponent.sprite = spriteToApply;
+                            labelImageComponent.color = Color.white;
+
+                            Logger.LogInfo(logMessage);
+
+                            // Hide company elements like TextureReplacer does
+                            HideCompanyElements(transform);
+                        }
+                        else
+                        {
+                            Logger.LogWarning($"No sprite available for grade {grade} and no DefaultLabel fallback");
+                        }
+                    }
+                }
             }
+        }
 
+        private static void HideCompanyElements(Transform transform)
+        {
+            // TextureReplacer already disables this and we can't re-enable it without maybe doing a post-postfix to texturereplacers setcardui patch??
+            // but we can leave it disabled for now
+            // Hide company elements exactly like TextureReplacer does
+            Transform labelImageCompany = transform.Find("LabelImageCompany");
+            if (labelImageCompany != null)
+            {
+                labelImageCompany.gameObject.SetActive(false);
+            }
+            // TextureReplacer already disables this and we can't re-enable it without maybe doing a post-postfix to texturereplacers setcardui patch??
+            // but for some reason it still shows up? so we will uncomment...?
+            Transform gradingCompanyText = transform.Find("GradingCompanyText");
+            if (gradingCompanyText != null)
+            {
+                gradingCompanyText.gameObject.SetActive(false);
+            }
         }
 
         private static void ClearCardBackMesh(Card3dUIGroup instance)
@@ -107,32 +151,69 @@ namespace GradedCardExpander.Patches
 
         private static void ApplyTextConfiguration(Card3dUIGroup instance, GradedCardGradeConfig config)
         {
+            Logger.LogInfo("ApplyTextConfiguration called");
+            Logger.LogInfo($"Processing GradeNumberText (null? {instance.m_GradeNumberText == null})");
             ApplyTextConfig(instance.m_GradeNumberText, config.GradeNumberText);
+
+            Logger.LogInfo($"Processing GradeDescriptionText (null? {instance.m_GradeDescriptionText == null})");
             ApplyTextConfig(instance.m_GradeDescriptionText, config.GradeDescriptionText);
+
+            Logger.LogInfo($"Processing GradeNameText (null? {instance.m_GradeNameText == null})");
             ApplyTextConfig(instance.m_GradeNameText, config.GradeNameText);
+
+            Logger.LogInfo($"Processing GradeExpansionRarityText (null? {instance.m_GradeExpansionRarityText == null})");
             ApplyTextConfig(instance.m_GradeExpansionRarityText, config.GradeExpansionRarityText);
         }
 
         private static void ApplyTextConfig(TMPro.TextMeshProUGUI text, GradedCardTextConfig config)
         {
-            if (text == null) return;
+            if (text == null)
+            {
+                Logger.LogWarning("ApplyTextConfig: text component is null");
+                return;
+            }
+
+            Logger.LogInfo($"Applying text config to: {text.name}");
 
             if (config.Color.HasValue)
             {
                 text.color = config.Color.Value;
+                Logger.LogInfo($"Applied color: {config.Color.Value}");
             }
             if (config.FontSize.HasValue)
             {
                 text.fontSize = config.FontSize.Value;
+                Logger.LogInfo($"Applied font size: {config.FontSize.Value}");
             }
             if (config.Font != null)
             {
                 text.font = config.Font;
+                Logger.LogInfo($"Applied font: {config.Font.name}");
+            }
+            else
+            {
+                Logger.LogInfo("No custom font specified in config");
             }
             if (config.Position.HasValue)
             {
                 var originalPos = text.rectTransform.anchoredPosition;
                 text.rectTransform.anchoredPosition = originalPos + config.Position.Value;
+                Logger.LogInfo($"Applied position offset: {config.Position.Value}");
+            }
+            if (config.Text != null)
+            {
+                text.text = config.Text;
+                Logger.LogInfo($"Applied custom text: '{config.Text}'");
+            }
+            if (config.OutlineColor.HasValue)
+            {
+                text.outlineColor = config.OutlineColor.Value;
+                Logger.LogInfo($"Applied outline color: {config.OutlineColor.Value}");
+            }
+            if (config.OutlineWidth.HasValue)
+            {
+                text.outlineWidth = config.OutlineWidth.Value;
+                Logger.LogInfo($"Applied outline width: {config.OutlineWidth.Value}");
             }
         }
     }

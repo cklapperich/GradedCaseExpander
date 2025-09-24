@@ -17,6 +17,9 @@ namespace GradedCardExpander
         public float? FontSize { get; set; } = null;
         public Vector2? Position { get; set; } = null;
         public TMP_FontAsset Font { get; set; } = null;
+        public string Text { get; set; } = null;
+        public Color? OutlineColor { get; set; } = null;
+        public float? OutlineWidth { get; set; } = null;
     }
 
     public class GradedCardGradeConfig
@@ -77,6 +80,8 @@ namespace GradedCardExpander
         internal static Dictionary<int, GradedCardGradeConfig> GradeConfigs = new Dictionary<int, GradedCardGradeConfig>();
         internal static Sprite TransparentSprite;
         internal static Dictionary<string, TMP_FontAsset> LoadedFonts = new Dictionary<string, TMP_FontAsset>();
+        internal static Texture2D DefaultLabelTexture;
+        internal static Sprite DefaultLabelSprite;
 
         // Debug config entries
         internal static ConfigEntry<bool> DebugCardBackMeshBlocker;
@@ -104,8 +109,14 @@ namespace GradedCardExpander
             string gradedCardCaseFile = Path.Combine(PluginPath, "DefaultLabel.txt");
             GradedConfig.Initialize(gradedCardCaseFile);
 
-            LoadGradeSpecificAssets();
+            LoadDefaultLabelSprite();
+            LoadGradeSpecificSprites();
             // CreateTransparentSprite(); // No longer needed - using grade-specific sprites
+
+            // Log summary of what was loaded
+            Logger.LogInfo($"Loaded sprites for grades: {string.Join(", ", GradeSprites.Keys)}");
+            Logger.LogInfo($"Loaded configs for grades: {string.Join(", ", GradeConfigs.Keys)}");
+            Logger.LogInfo($"Available fonts: {string.Join(", ", LoadedFonts.Keys)}");
 
             harmony.PatchAll();
             Logger.LogInfo("GradedCardCaseExpander loaded successfully!");
@@ -142,7 +153,104 @@ namespace GradedCardExpander
                             tmpFontAsset.material.name = $"{fileName}_Material";
                         }
                         LoadedFonts[fontKey] = tmpFontAsset;
+                        Logger.LogInfo($"Successfully loaded font: {fontKey} from {fontPath}");
                     }
+                    else
+                    {
+                        Logger.LogWarning($"Failed to create TMP_FontAsset from Unity Font: {fontPath}");
+                    }
+                }
+                else
+                {
+                    Logger.LogWarning($"Failed to load Unity Font from: {fontPath}");
+                }
+            }
+        }
+
+        private void LoadDefaultLabelSprite()
+        {
+            string imagePath = Path.Combine(PluginPath, "DefaultLabel.png");
+            if (File.Exists(imagePath))
+            {
+                byte[] imageData = File.ReadAllBytes(imagePath);
+                DefaultLabelTexture = new Texture2D(2, 2);
+                DefaultLabelTexture.LoadImage(imageData);
+
+                // Set texture properties like TextureReplacer would
+                DefaultLabelTexture.name = "DefaultLabelTexture";
+                DefaultLabelTexture.filterMode = FilterMode.Bilinear;
+                DefaultLabelTexture.wrapMode = TextureWrapMode.Clamp;
+                DefaultLabelTexture.Apply();
+
+                // Convert to sprite like TextureReplacer does with TextureToSprite()
+                DefaultLabelSprite = Sprite.Create(DefaultLabelTexture, new Rect(0, 0, DefaultLabelTexture.width, DefaultLabelTexture.height), new Vector2(0.5f, 0.5f));
+                DefaultLabelSprite.name = "DefaultLabelSprite";
+
+                Logger.LogInfo($"Loaded DefaultLabel.png: {DefaultLabelTexture.width}x{DefaultLabelTexture.height}");
+            }
+            else
+            {
+                Logger.LogWarning($"DefaultLabel.png not found at: {imagePath}");
+            }
+        }
+
+        private void LoadGradeSpecificSprites()
+        {
+            // Load grade-specific sprites (1.png to 10.png) using the same format as DefaultLabel
+            for (int grade = 1; grade <= 10; grade++)
+            {
+                string imagePath = Path.Combine(PluginPath, $"{grade}.png");
+                if (File.Exists(imagePath))
+                {
+                    byte[] imageData = File.ReadAllBytes(imagePath);
+                    Texture2D texture = new Texture2D(2, 2);
+                    texture.LoadImage(imageData);
+
+                    // Set texture properties like TextureReplacer would
+                    texture.name = $"Grade{grade}Texture";
+                    texture.filterMode = FilterMode.Bilinear;
+                    texture.wrapMode = TextureWrapMode.Clamp;
+                    texture.Apply();
+
+                    Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+                    sprite.name = $"Grade{grade}Sprite";
+
+                    GradeSprites[grade] = sprite;
+                    GradeTextures[grade] = texture;
+
+                    Logger.LogInfo($"Loaded grade {grade} sprite: {texture.width}x{texture.height}");
+                }
+                else
+                {
+                    Logger.LogInfo($"Grade {grade}.png not found at: {imagePath}");
+                }
+            }
+
+            // Also load corresponding .txt files for grade-specific text configs
+            LoadGradeSpecificConfigs();
+        }
+
+        private void LoadGradeSpecificConfigs()
+        {
+            // Load DefaultLabel.txt first as fallback (grade 0)
+            string defaultConfigPath = Path.Combine(PluginPath, "DefaultLabel.txt");
+            if (File.Exists(defaultConfigPath))
+            {
+                var defaultConfig = new GradedCardGradeConfig();
+                LoadTextConfig(defaultConfigPath, defaultConfig);
+                GradeConfigs[0] = defaultConfig;
+            }
+
+            // Load grade-specific configs (1.txt to 10.txt)
+            for (int grade = 1; grade <= 10; grade++)
+            {
+                string configPath = Path.Combine(PluginPath, $"{grade}.txt");
+                if (File.Exists(configPath))
+                {
+                    var gradeConfig = new GradedCardGradeConfig();
+                    LoadTextConfig(configPath, gradeConfig);
+                    GradeConfigs[grade] = gradeConfig;
+                    Logger.LogInfo($"Loaded config for grade {grade} from: {configPath}");
                 }
             }
         }
@@ -274,6 +382,25 @@ namespace GradedCardExpander
                                 {
                                     var currentOffset = currentTextConfig.Position ?? Vector2.zero;
                                     currentTextConfig.Position = new Vector2(currentOffset.x, offsetY);
+                                }
+                                break;
+                            case "Text":
+                                currentTextConfig.Text = value;
+                                break;
+                            case "OutlineColor":
+                                if (ColorUtility.TryParseHtmlString(value, out Color outlineColor))
+                                {
+                                    currentTextConfig.OutlineColor = outlineColor;
+                                }
+                                else
+                                {
+                                    Logger.LogWarning($"Failed to parse outline color '{value}' in {configFile}");
+                                }
+                                break;
+                            case "OutlineWidth":
+                                if (float.TryParse(value, out float outlineWidth))
+                                {
+                                    currentTextConfig.OutlineWidth = outlineWidth;
                                 }
                                 break;
                         }
