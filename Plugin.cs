@@ -78,7 +78,6 @@ namespace GradedCardExpander
         internal static Dictionary<int, Sprite> GradeSprites = new Dictionary<int, Sprite>();
         internal static Dictionary<int, Texture2D> GradeTextures = new Dictionary<int, Texture2D>();
         internal static Dictionary<int, GradedCardGradeConfig> GradeConfigs = new Dictionary<int, GradedCardGradeConfig>();
-        internal static Sprite TransparentSprite;
         internal static Dictionary<string, TMP_FontAsset> LoadedFonts = new Dictionary<string, TMP_FontAsset>();
         internal static Texture2D DefaultLabelTexture;
         internal static Sprite DefaultLabelSprite;
@@ -111,7 +110,6 @@ namespace GradedCardExpander
 
             LoadDefaultLabelSprite();
             LoadGradeSpecificSprites();
-            // CreateTransparentSprite(); // No longer needed - using grade-specific sprites
 
             // Log summary of what was loaded
             Logger.LogInfo($"Loaded sprites for grades: {string.Join(", ", GradeSprites.Keys)}");
@@ -384,86 +382,6 @@ namespace GradedCardExpander
                     }
                 }
             }
-        }
-
-        private void CreateTransparentSprite()
-        {
-            // Create a 615x160 transparent texture (same size as expected label)
-            // This matches the documented label size and ensures proper stretching behavior
-            Texture2D transparentTexture = new Texture2D(615, 160);
-
-            // Fill entire texture with transparent pixels
-            Color[] transparentPixels = new Color[615 * 160];
-            for (int i = 0; i < transparentPixels.Length; i++)
-            {
-                transparentPixels[i] = Color.clear; // Fully transparent
-            }
-            transparentTexture.SetPixels(transparentPixels);
-            transparentTexture.Apply();
-            transparentTexture.name = "TransparentTexture_615x160";
-
-            // Create sprite from the transparent texture
-            TransparentSprite = Sprite.Create(transparentTexture, new Rect(0, 0, 615, 160), new Vector2(0.5f, 0.5f));
-            TransparentSprite.name = "TransparentSprite_615x160";
-
-            Logger.LogInfo("Created 615x160 transparent sprite for LabelImageBack replacement");
-        }
-
-        public static Mesh CreateQuadMesh()
-        {
-            Mesh mesh = new Mesh();
-
-            // Vertices for a quad (rectangle)
-            Vector3[] vertices = new Vector3[4]
-            {
-                new Vector3(-0.5f, -0.5f, 0f), // Bottom-left
-                new Vector3(0.5f, -0.5f, 0f),  // Bottom-right
-                new Vector3(-0.5f, 0.5f, 0f),  // Top-left
-                new Vector3(0.5f, 0.5f, 0f)    // Top-right
-            };
-
-            // UV coordinates for texture mapping
-            Vector2[] uv = new Vector2[4]
-            {
-                new Vector2(0, 0), // Bottom-left
-                new Vector2(1, 0), // Bottom-right
-                new Vector2(0, 1), // Top-left
-                new Vector2(1, 1)  // Top-right
-            };
-
-            // Triangles (two triangles make a quad)
-            int[] triangles = new int[6]
-            {
-                0, 2, 1, // First triangle
-                2, 3, 1  // Second triangle
-            };
-
-            mesh.vertices = vertices;
-            mesh.uv = uv;
-            mesh.triangles = triangles;
-            mesh.RecalculateNormals();
-
-            return mesh;
-        }
-
-        public static Material CreateTransparentMaterial(Texture2D texture)
-        {
-            Material material = new Material(Shader.Find("Standard"));
-            material.SetFloat("_Mode", 3); // Transparent mode
-            material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            material.SetInt("_ZWrite", 0);
-            material.DisableKeyword("_ALPHATEST_ON");
-            material.EnableKeyword("_ALPHABLEND_ON");
-            material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-            material.renderQueue = 3000;
-
-            if (texture != null)
-            {
-                material.mainTexture = texture;
-            }
-
-            return material;
         }
     }
 }
