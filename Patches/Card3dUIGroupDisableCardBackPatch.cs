@@ -48,15 +48,12 @@ namespace GradedCardExpander.Patches
                 //ClearCardBackMesh(__instance);
 
                 // Apply text configuration
-                Logger.LogInfo($"Looking for text config for grade {grade}");
                 if (Plugin.GradeConfigs.ContainsKey(grade))
                 {
-                    Logger.LogInfo($"Found grade {grade} config, applying...");
                     ApplyTextConfiguration(__instance, Plugin.GradeConfigs[grade]);
                 }
                 else if (Plugin.GradeConfigs.ContainsKey(0)) // Fallback to DefaultLabel.txt
                 {
-                    Logger.LogInfo($"No grade {grade} config, using DefaultLabel.txt fallback");
                     ApplyTextConfiguration(__instance, Plugin.GradeConfigs[0]);
                 }
                 else
@@ -80,29 +77,23 @@ namespace GradedCardExpander.Patches
                     {
                         // Try grade-specific sprite first, then fallback to DefaultLabel
                         Sprite spriteToApply = null;
-                        string logMessage = "";
-
                         if (Plugin.GradeSprites.ContainsKey(grade))
                         {
                             spriteToApply = Plugin.GradeSprites[grade];
-                            logMessage = $"Applied grade {grade} sprite to LabelImage";
                         }
                         else if (Plugin.DefaultLabelSprite != null)
                         {
                             spriteToApply = Plugin.DefaultLabelSprite;
-                            logMessage = $"Applied DefaultLabel.png fallback for grade {grade}";
                         }
 
                         if (spriteToApply != null)
                         {
                             // Copy the original sprite name like TextureReplacer does
-                            spriteToApply.name = labelImageComponent.sprite.name;
+                            // spriteToApply.name = labelImageComponent.sprite.name;
 
                             // Replace the sprite
                             labelImageComponent.sprite = spriteToApply;
                             labelImageComponent.color = Color.white;
-
-                            Logger.LogInfo(logMessage);
 
                             // Hide company elements like TextureReplacer does
                             HideCompanyElements(transform);
@@ -151,17 +142,12 @@ namespace GradedCardExpander.Patches
 
         private static void ApplyTextConfiguration(Card3dUIGroup instance, GradedCardGradeConfig config)
         {
-            Logger.LogInfo("ApplyTextConfiguration called");
-            Logger.LogInfo($"Processing GradeNumberText (null? {instance.m_GradeNumberText == null})");
             ApplyTextConfig(instance.m_GradeNumberText, config.GradeNumberText);
 
-            Logger.LogInfo($"Processing GradeDescriptionText (null? {instance.m_GradeDescriptionText == null})");
             ApplyTextConfig(instance.m_GradeDescriptionText, config.GradeDescriptionText);
 
-            Logger.LogInfo($"Processing GradeNameText (null? {instance.m_GradeNameText == null})");
             ApplyTextConfig(instance.m_GradeNameText, config.GradeNameText);
 
-            Logger.LogInfo($"Processing GradeExpansionRarityText (null? {instance.m_GradeExpansionRarityText == null})");
             ApplyTextConfig(instance.m_GradeExpansionRarityText, config.GradeExpansionRarityText);
         }
 
@@ -173,47 +159,36 @@ namespace GradedCardExpander.Patches
                 return;
             }
 
-            Logger.LogInfo($"Applying text config to: {text.name}");
-
+         
             if (config.Color.HasValue)
             {
                 text.color = config.Color.Value;
-                Logger.LogInfo($"Applied color: {config.Color.Value}");
             }
             if (config.FontSize.HasValue)
             {
                 text.fontSize = config.FontSize.Value;
-                Logger.LogInfo($"Applied font size: {config.FontSize.Value}");
             }
             if (config.Font != null)
             {
                 text.font = config.Font;
-                Logger.LogInfo($"Applied font: {config.Font.name}");
             }
-            else
-            {
-                Logger.LogInfo("No custom font specified in config");
-            }
+
             if (config.Position.HasValue)
             {
                 var originalPos = text.rectTransform.anchoredPosition;
                 text.rectTransform.anchoredPosition = originalPos + config.Position.Value;
-                Logger.LogInfo($"Applied position offset: {config.Position.Value}");
             }
             if (config.Text != null)
             {
                 text.text = config.Text;
-                Logger.LogInfo($"Applied custom text: '{config.Text}'");
             }
             if (config.OutlineColor.HasValue)
             {
                 text.outlineColor = config.OutlineColor.Value;
-                Logger.LogInfo($"Applied outline color: {config.OutlineColor.Value}");
             }
             if (config.OutlineWidth.HasValue)
             {
                 text.outlineWidth = config.OutlineWidth.Value;
-                Logger.LogInfo($"Applied outline width: {config.OutlineWidth.Value}");
             }
         }
     }

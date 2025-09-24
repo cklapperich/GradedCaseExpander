@@ -153,16 +153,7 @@ namespace GradedCardExpander
                             tmpFontAsset.material.name = $"{fileName}_Material";
                         }
                         LoadedFonts[fontKey] = tmpFontAsset;
-                        Logger.LogInfo($"Successfully loaded font: {fontKey} from {fontPath}");
                     }
-                    else
-                    {
-                        Logger.LogWarning($"Failed to create TMP_FontAsset from Unity Font: {fontPath}");
-                    }
-                }
-                else
-                {
-                    Logger.LogWarning($"Failed to load Unity Font from: {fontPath}");
                 }
             }
         }
@@ -185,12 +176,6 @@ namespace GradedCardExpander
                 // Convert to sprite like TextureReplacer does with TextureToSprite()
                 DefaultLabelSprite = Sprite.Create(DefaultLabelTexture, new Rect(0, 0, DefaultLabelTexture.width, DefaultLabelTexture.height), new Vector2(0.5f, 0.5f));
                 DefaultLabelSprite.name = "DefaultLabelSprite";
-
-                Logger.LogInfo($"Loaded DefaultLabel.png: {DefaultLabelTexture.width}x{DefaultLabelTexture.height}");
-            }
-            else
-            {
-                Logger.LogWarning($"DefaultLabel.png not found at: {imagePath}");
             }
         }
 
@@ -217,12 +202,6 @@ namespace GradedCardExpander
 
                     GradeSprites[grade] = sprite;
                     GradeTextures[grade] = texture;
-
-                    Logger.LogInfo($"Loaded grade {grade} sprite: {texture.width}x{texture.height}");
-                }
-                else
-                {
-                    Logger.LogInfo($"Grade {grade}.png not found at: {imagePath}");
                 }
             }
 
@@ -250,7 +229,6 @@ namespace GradedCardExpander
                     var gradeConfig = new GradedCardGradeConfig();
                     LoadTextConfig(configPath, gradeConfig);
                     GradeConfigs[grade] = gradeConfig;
-                    Logger.LogInfo($"Loaded config for grade {grade} from: {configPath}");
                 }
             }
         }
@@ -329,7 +307,6 @@ namespace GradedCardExpander
                         "GradeExpansionRarityText" => gradeConfig.GradeExpansionRarityText,
                         _ => null
                     };
-                    Logger.LogInfo($"Found section [{sectionName}] in {configFile}, valid: {currentTextConfig != null}");
                     continue;
                 }
 

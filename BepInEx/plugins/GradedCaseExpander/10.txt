@@ -1,7 +1,6 @@
 [GradeNumberText]
 Color=#FFD700
 FontSize=28
-Font=wingdings
 OffsetX=0
 OffsetY=0
 Text=AAAAAAAAAAAA
@@ -23,7 +22,6 @@ Text=CCCCCCCCCCCCCCC
 [GradeExpansionRarityText]
 Color=#FFD700
 FontSize=16
-Font=
 OffsetX=0
 OffsetY=0
 Text=DDDDDDDDDDD
