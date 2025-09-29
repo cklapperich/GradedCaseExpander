@@ -16,6 +16,7 @@ namespace GradedCardExpander
         public Color? Color { get; set; } = null;
         public float? FontSize { get; set; } = null;
         public Vector2? Position { get; set; } = null;
+        public Vector2? Position2D { get; set; } = null;
         public TMP_FontAsset Font { get; set; } = null;
         public string Text { get; set; } = null;
         public Color? OutlineColor { get; set; } = null;
@@ -28,6 +29,7 @@ namespace GradedCardExpander
         public GradedCardTextConfig GradeDescriptionText { get; set; } = new GradedCardTextConfig();
         public GradedCardTextConfig GradeNameText { get; set; } = new GradedCardTextConfig();
         public GradedCardTextConfig GradeExpansionRarityText { get; set; } = new GradedCardTextConfig();
+        public GradedCardTextConfig GradeSerialText { get; set; } = new GradedCardTextConfig();
     }
 
     public class GradedCardConfig
@@ -56,15 +58,10 @@ namespace GradedCardExpander
             }
 
             // Note: LoadTextConfig moved to Plugin class for grade-specific loading
-            Plugin.Logger.LogInfo($"Loaded graded card text config from: {_configFilePath}");
         }
     }
-
-    public static class MyPluginInfo
-    {
-        public const string PLUGIN_GUID ="com.snowbloom.cardshopsim.gradedcardcaseexpander";
-        public const string PLUGIN_NAME = "GradedCardCaseExpander";
-        public const string PLUGIN_VERSION = "1.0.0";
+            // Debug logging for SerialText position discovery - don't apply position changes yetaseExpander";
+        public const string PLUGIN_VERSION = "1.1.0";
     }
 
     [BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
@@ -74,13 +71,18 @@ namespace GradedCardExpander
     {
         internal static new ManualLogSource Logger;
         internal static string PluginPath;
+            // Debug logging for SerialText position discovery - don't apply position changes yet
         internal static GradedCardConfig GradedConfig = new GradedCardConfig();
         internal static Dictionary<int, Sprite> GradeSprites = new Dictionary<int, Sprite>();
         internal static Dictionary<int, Texture2D> GradeTextures = new Dictionary<int, Texture2D>();
+        internal static Dictionary<int, Sprite> GradeCroppedSprites = new Dictionary<int, Sprite>();
         internal static Dictionary<int, GradedCardGradeConfig> GradeConfigs = new Dictionary<int, GradedCardGradeConfig>();
         internal static Dictionary<string, TMP_FontAsset> LoadedFonts = new Dictionary<string, TMP_FontAsset>();
-        internal static Texture2D DefaultLabelTexture;
-        internal static Sprite DefaultLabelSprite;
+
+        // Convenience properties for accessing default (grade 0) assets
+        internal static Texture2D DefaultLabelTexture => GradeTextures.ContainsKey(0) ? GradeTextures[0] : null;
+        internal static Sprite DefaultLabelSprite => GradeSprites.ContainsKey(0) ? GradeSprites[0] : null;
+        internal static Sprite DefaultLabelCroppedSprite => GradeCroppedSprites.ContainsKey(0) ? GradeCroppedSprites[0] : null;
 
         // Debug config entries
         internal static ConfigEntry<bool> DebugCardBackMeshBlocker;
@@ -111,13 +113,30 @@ namespace GradedCardExpander
             LoadDefaultLabelSprite();
             LoadGradeSpecificSprites();
 
-            // Log summary of what was loaded
-            Logger.LogInfo($"Loaded sprites for grades: {string.Join(", ", GradeSprites.Keys)}");
-            Logger.LogInfo($"Loaded configs for grades: {string.Join(", ", GradeConfigs.Keys)}");
-            Logger.LogInfo($"Available fonts: {string.Join(", ", LoadedFonts.Keys)}");
 
             harmony.PatchAll();
-            Logger.LogInfo("GradedCardCaseExpander loaded successfully!");
+        }
+
+        private static Texture2D CropTextureForGradedCard(Texture2D sourceTexture)
+        {
+            // Mimic TextureReplacer's cropping logic from the commented code
+            int cropX = 271;
+            int cropWidth = 484;
+            int cropHeight = 128;
+            int cropY = sourceTexture.height - 208; // num6 = ((Texture)cachedTexture).height - 208
+
+            // Create new texture with cropped dimensions
+            Texture2D croppedTexture = new Texture2D(cropWidth, cropHeight, TextureFormat.ARGB32, false);
+
+            // Use Graphics.CopyTexture like TextureReplacer does
+            Graphics.CopyTexture(sourceTexture, 0, 0, cropX, cropY, cropWidth, cropHeight, croppedTexture, 0, 0, 0, 0);
+
+            // Set texture properties
+            croppedTexture.filterMode = FilterMode.Bilinear;
+            croppedTexture.wrapMode = TextureWrapMode.Clamp;
+            croppedTexture.Apply();
+
+            return croppedTexture;
         }
 
         private void LoadCustomFonts()
@@ -162,18 +181,24 @@ namespace GradedCardExpander
             if (File.Exists(imagePath))
             {
                 byte[] imageData = File.ReadAllBytes(imagePath);
-                DefaultLabelTexture = new Texture2D(2, 2);
-                DefaultLabelTexture.LoadImage(imageData);
+                Texture2D fullTexture = new Texture2D(2, 2);
+                fullTexture.LoadImage(imageData);
 
                 // Set texture properties like TextureReplacer would
-                DefaultLabelTexture.name = "DefaultLabelTexture";
-                DefaultLabelTexture.filterMode = FilterMode.Bilinear;
-                DefaultLabelTexture.wrapMode = TextureWrapMode.Clamp;
-                DefaultLabelTexture.Apply();
+                fullTexture.name = "DefaultLabelTexture";
+                fullTexture.filterMode = FilterMode.Bilinear;
+                fullTexture.wrapMode = TextureWrapMode.Clamp;
+                fullTexture.Apply();
 
-                // Convert to sprite like TextureReplacer does with TextureToSprite()
-                DefaultLabelSprite = Sprite.Create(DefaultLabelTexture, new Rect(0, 0, DefaultLabelTexture.width, DefaultLabelTexture.height), new Vector2(0.5f, 0.5f));
-                DefaultLabelSprite.name = "DefaultLabelSprite";
+                // Store full texture and sprite (grade 0)
+                GradeTextures[0] = fullTexture;
+                GradeSprites[0] = Sprite.Create(fullTexture, new Rect(0, 0, fullTexture.width, fullTexture.height), new Vector2(0.5f, 0.5f));
+                GradeSprites[0].name = "DefaultLabelSprite";
+
+                // Create and store cropped sprite only
+                Texture2D croppedTexture = CropTextureForGradedCard(fullTexture);
+                GradeCroppedSprites[0] = Sprite.Create(croppedTexture, new Rect(0, 0, croppedTexture.width, croppedTexture.height), new Vector2(0.5f, 0.5f));
+                GradeCroppedSprites[0].name = "DefaultLabelCroppedSprite";
             }
         }
 
@@ -186,20 +211,24 @@ namespace GradedCardExpander
                 if (File.Exists(imagePath))
                 {
                     byte[] imageData = File.ReadAllBytes(imagePath);
-                    Texture2D texture = new Texture2D(2, 2);
-                    texture.LoadImage(imageData);
+                    Texture2D fullTexture = new Texture2D(2, 2);
+                    fullTexture.LoadImage(imageData);
 
                     // Set texture properties like TextureReplacer would
-                    texture.name = $"Grade{grade}Texture";
-                    texture.filterMode = FilterMode.Bilinear;
-                    texture.wrapMode = TextureWrapMode.Clamp;
-                    texture.Apply();
+                    fullTexture.name = $"Grade{grade}Texture";
+                    fullTexture.filterMode = FilterMode.Bilinear;
+                    fullTexture.wrapMode = TextureWrapMode.Clamp;
+                    fullTexture.Apply();
 
-                    Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
-                    sprite.name = $"Grade{grade}Sprite";
+                    // Store full texture and sprite
+                    GradeTextures[grade] = fullTexture;
+                    GradeSprites[grade] = Sprite.Create(fullTexture, new Rect(0, 0, fullTexture.width, fullTexture.height), new Vector2(0.5f, 0.5f));
+                    GradeSprites[grade].name = $"Grade{grade}Sprite";
 
-                    GradeSprites[grade] = sprite;
-                    GradeTextures[grade] = texture;
+                    // Create and store cropped sprite only
+                    Texture2D croppedTexture = CropTextureForGradedCard(fullTexture);
+                    GradeCroppedSprites[grade] = Sprite.Create(croppedTexture, new Rect(0, 0, croppedTexture.width, croppedTexture.height), new Vector2(0.5f, 0.5f));
+                    GradeCroppedSprites[grade].name = $"Grade{grade}CroppedSprite";
                 }
             }
 
@@ -243,11 +272,6 @@ namespace GradedCardExpander
             }
 
 
-            // Log which grades have sprites loaded for debugging
-            foreach (var kvp in GradeSprites)
-            {
-                string gradeName = kvp.Key == 0 ? "DefaultLabel" : kvp.Key.ToString();
-            }
         }
 
         private void LoadGradeAssets(int gradeKey, string baseName)
@@ -257,20 +281,24 @@ namespace GradedCardExpander
             if (File.Exists(imagePath))
             {
                 byte[] imageData = File.ReadAllBytes(imagePath);
-                Texture2D texture = new Texture2D(2, 2);
-                texture.LoadImage(imageData);
+                Texture2D fullTexture = new Texture2D(2, 2);
+                fullTexture.LoadImage(imageData);
 
                 // Set texture properties
-                texture.name = $"GradeTexture_{baseName}";
-                texture.filterMode = FilterMode.Bilinear;
-                texture.wrapMode = TextureWrapMode.Clamp;
-                texture.Apply(); // Apply texture changes
+                fullTexture.name = $"GradeTexture_{baseName}";
+                fullTexture.filterMode = FilterMode.Bilinear;
+                fullTexture.wrapMode = TextureWrapMode.Clamp;
+                fullTexture.Apply(); // Apply texture changes
 
-                Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
-                sprite.name = $"GradeSprite_{baseName}";
+                // Store full texture and sprite
+                GradeTextures[gradeKey] = fullTexture;
+                GradeSprites[gradeKey] = Sprite.Create(fullTexture, new Rect(0, 0, fullTexture.width, fullTexture.height), new Vector2(0.5f, 0.5f));
+                GradeSprites[gradeKey].name = $"GradeSprite_{baseName}";
 
-                GradeSprites[gradeKey] = sprite;
-                GradeTextures[gradeKey] = texture;
+                // Create and store cropped sprite only
+                Texture2D croppedTexture = CropTextureForGradedCard(fullTexture);
+                GradeCroppedSprites[gradeKey] = Sprite.Create(croppedTexture, new Rect(0, 0, croppedTexture.width, croppedTexture.height), new Vector2(0.5f, 0.5f));
+                GradeCroppedSprites[gradeKey].name = $"GradeCroppedSprite_{baseName}";
             }
 
             // Load config
@@ -303,6 +331,7 @@ namespace GradedCardExpander
                         "GradeDescriptionText" => gradeConfig.GradeDescriptionText,
                         "GradeNameText" => gradeConfig.GradeNameText,
                         "GradeExpansionRarityText" => gradeConfig.GradeExpansionRarityText,
+                        "GradeSerialText" => gradeConfig.GradeSerialText,
                         _ => null
                     };
                     continue;
@@ -357,6 +386,20 @@ namespace GradedCardExpander
                                 {
                                     var currentOffset = currentTextConfig.Position ?? Vector2.zero;
                                     currentTextConfig.Position = new Vector2(currentOffset.x, offsetY);
+                                }
+                                break;
+                            case "Offset2DX":
+                                if (float.TryParse(value, out float offset2DX))
+                                {
+                                    var currentOffset2D = currentTextConfig.Position2D ?? Vector2.zero;
+                                    currentTextConfig.Position2D = new Vector2(offset2DX, currentOffset2D.y);
+                                }
+                                break;
+                            case "Offset2DY":
+                                if (float.TryParse(value, out float offset2DY))
+                                {
+                                    var currentOffset2D = currentTextConfig.Position2D ?? Vector2.zero;
+                                    currentTextConfig.Position2D = new Vector2(currentOffset2D.x, offset2DY);
                                 }
                                 break;
                             case "Text":

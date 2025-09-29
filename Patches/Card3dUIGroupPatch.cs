@@ -37,15 +37,13 @@ namespace GradedCardExpander.Patches
             // Only apply to graded cards (grade > 0)
             if (__instance.m_GradedCardGrp != null && cardData != null && cardData.cardGrade > 0)
             {
-                // Log the actual GameObject name for debugging
-                //Logger.LogInfo($"GradedCardGrp GameObject name: '{__instance.m_GradedCardGrp.name}'");
                 int grade = cardData.cardGrade;
 
                 // Apply grade-specific sprite or fallback to DefaultLabel
                 ApplyGradeSprite(__instance, grade);
 
                 // Clear CardBackMesh to prevent black rectangle
-                //ClearCardBackMesh(__instance);
+                // ClearCardBackMesh(__instance);
 
                 // Apply text configuration
                 if (Plugin.GradeConfigs.ContainsKey(grade))
@@ -75,15 +73,15 @@ namespace GradedCardExpander.Patches
                     Image labelImageComponent = labelImageTransform.GetComponent<Image>();
                     if (labelImageComponent != null && labelImageComponent.sprite != null)
                     {
-                        // Try grade-specific sprite first, then fallback to DefaultLabel
+                        // Try grade-specific cropped sprite first, then fallback to DefaultLabel cropped sprite
                         Sprite spriteToApply = null;
-                        if (Plugin.GradeSprites.ContainsKey(grade))
+                        if (Plugin.GradeCroppedSprites.ContainsKey(grade))
                         {
-                            spriteToApply = Plugin.GradeSprites[grade];
+                            spriteToApply = Plugin.GradeCroppedSprites[grade];
                         }
-                        else if (Plugin.DefaultLabelSprite != null)
+                        else if (Plugin.DefaultLabelCroppedSprite != null)
                         {
-                            spriteToApply = Plugin.DefaultLabelSprite;
+                            spriteToApply = Plugin.DefaultLabelCroppedSprite;
                         }
 
                         if (spriteToApply != null)
@@ -142,54 +140,7 @@ namespace GradedCardExpander.Patches
 
         private static void ApplyTextConfiguration(Card3dUIGroup instance, GradedCardGradeConfig config)
         {
-            ApplyTextConfig(instance.m_GradeNumberText, config.GradeNumberText);
-
-            ApplyTextConfig(instance.m_GradeDescriptionText, config.GradeDescriptionText);
-
-            ApplyTextConfig(instance.m_GradeNameText, config.GradeNameText);
-
-            ApplyTextConfig(instance.m_GradeExpansionRarityText, config.GradeExpansionRarityText);
-        }
-
-        private static void ApplyTextConfig(TMPro.TextMeshProUGUI text, GradedCardTextConfig config)
-        {
-            if (text == null)
-            {
-                Logger.LogWarning("ApplyTextConfig: text component is null");
-                return;
-            }
-
-         
-            if (config.Color.HasValue)
-            {
-                text.color = config.Color.Value;
-            }
-            if (config.FontSize.HasValue)
-            {
-                text.fontSize = config.FontSize.Value;
-            }
-            if (config.Font != null)
-            {
-                text.font = config.Font;
-            }
-
-            if (config.Position.HasValue)
-            {
-                var originalPos = text.rectTransform.anchoredPosition;
-                text.rectTransform.anchoredPosition = originalPos + config.Position.Value;
-            }
-            if (config.Text != null)
-            {
-                text.text = config.Text;
-            }
-            if (config.OutlineColor.HasValue)
-            {
-                text.outlineColor = config.OutlineColor.Value;
-            }
-            if (config.OutlineWidth.HasValue)
-            {
-                text.outlineWidth = config.OutlineWidth.Value;
-            }
+            GradedCardTextUtils.ApplyTextConfiguration(instance, config, is3D: true);
         }
     }
 }
