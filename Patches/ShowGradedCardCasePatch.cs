@@ -10,24 +10,8 @@ namespace GradedCardExpander.Patches
     public class ShowGradedCardCasePatch
     {
         private static readonly ManualLogSource Logger = BepInEx.Logging.Logger.CreateLogSource("ShowGradedCardCasePatch");
-
-        // Uncomment this method if you need to debug the hierarchy
-        /*
-        static void Prefix(CardUI __instance, bool isShow)
-        {
-            if (__instance.GetCardData() != null)
-            {
-                int cardGrade = __instance.GetCardData().cardGrade;
-                // Only dump hierarchy for graded cards that are being shown
-                if (isShow && cardGrade > 0 && __instance.m_GradedCardCaseGrp != null)
-                {
-                    DebugUtils.DumpObjectHierarchyWithHeader(__instance.m_GradedCardCaseGrp, "m_GradedCardCaseGrp HIERARCHY");
-                }
-            }
-        }
-        */
-
-        static void Postfix(CardUI __instance, bool isShow)
+    
+        static void Postf ix(CardUI __instance, bool isShow)
         {
             if (!isShow || __instance.m_GradedCardCaseGrp == null)
                 return;
@@ -61,12 +45,6 @@ namespace GradedCardExpander.Patches
                     {
                         gradedCardCaseImage.sprite = spriteToApply;
                         gradedCardCaseImage.color = Color.white;
-
-                        Logger.LogInfo($"Applied grade {grade} sprite to CardUI GradedCardCase");
-                    }
-                    else
-                    {
-                        Logger.LogWarning($"No sprite available for grade {grade} and no DefaultLabel fallback");
                     }
                 }
             }
@@ -79,10 +57,6 @@ namespace GradedCardExpander.Patches
             else if (Plugin.GradeConfigs.ContainsKey(0)) // Fallback to DefaultLabel.txt
             {
                 GradedCardTextUtils.ApplyTextConfiguration(__instance, Plugin.GradeConfigs[0], is3D: false);
-            }
-            else
-            {
-                Logger.LogWarning($"No text configuration found for grade {grade} or fallback");
             }
         }
     }

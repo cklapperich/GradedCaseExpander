@@ -32,9 +32,24 @@ namespace GradedCardExpander
         /// </summary>
         public static void ApplyTextConfig(TextMeshProUGUI text, GradedCardTextConfig config, bool is3D = false)
         {
+            // Null check - critical for binder view where text components may not exist
+            if (text == null)
+            {
+                Logger.LogWarning($"ApplyTextConfig called with null text component");
+                return;
+            }
+
+            if (config == null)
+            {
+                Logger.LogWarning($"ApplyTextConfig called with null config for {text.name}");
+                return;
+            }
+
+            Logger.LogInfo($"=== Applying config to {text.name} (is3D={is3D}) ===");
+
             // Enable rich text and word wrapping for all text components
             text.richText = true;
-            //text.enableWordWrapping = true;
+            text.enableWordWrapping = true;
 
             if (config.Color.HasValue)
             {
@@ -66,25 +81,30 @@ namespace GradedCardExpander
             {
                 text.text = config.Text;
             }
+            if (config.MaxTextWidthPixels.HasValue)
+            {
+                var sizeDelta = text.rectTransform.sizeDelta;
+                text.rectTransform.sizeDelta = new Vector2(config.MaxTextWidthPixels.Value, sizeDelta.y);
+            }
+            // Handle outline settings - must set on component properties, not material
             if (config.OutlineColor.HasValue)
             {
+                Logger.LogInfo($"=== Setting outline color on {text.name} to {config.OutlineColor.Value} ===");
                 text.outlineColor = config.OutlineColor.Value;
             }
+
             if (config.OutlineWidth.HasValue)
             {
-                // TextMeshPro outline width should be between 0.0 and 1.0 typically
-                // Values outside this range can cause unexpected behavior
                 float clampedWidth = Mathf.Clamp(config.OutlineWidth.Value, 0.0f, 1.0f);
-
-                // Create a new material instance to avoid affecting other text components
-                if (text.fontMaterial != null)
-                {
-                    text.fontMaterial = new Material(text.fontMaterial);
-                    text.fontMaterial.SetFloat("_OutlineWidth", clampedWidth);
-                }
-
-                // Also set the component property as backup
+                Logger.LogInfo($"=== Setting outline width on {text.name} to {clampedWidth} ===");
                 text.outlineWidth = clampedWidth;
+            }
+
+            // Update the vertex colors to apply outline changes
+            if (config.OutlineColor.HasValue || config.OutlineWidth.HasValue)
+            {
+                Logger.LogInfo($"Calling UpdateVertexData to apply outline changes");
+                text.UpdateVertexData(TMPro.TMP_VertexDataUpdateFlags.All);
             }
 
             // Force mesh update to ensure all changes are applied immediately
@@ -97,6 +117,20 @@ namespace GradedCardExpander
         /// </summary>
         public static void ApplyTextConfiguration(object instance, GradedCardGradeConfig config, bool is3D = false)
         {
+            if (instance == null)
+            {
+                Logger.LogWarning($"ApplyTextConfiguration called with null instance");
+                return;
+            }
+
+            if (config == null)
+            {
+                Logger.LogWarning($"ApplyTextConfiguration called with null config");
+                return;
+            }
+
+            Logger.LogInfo($"=== ApplyTextConfiguration on {instance.GetType().Name} (is3D={is3D}) ===");
+
             var type = instance.GetType();
 
             var gradeNumberText = type.GetField("m_GradeNumberText")?.GetValue(instance) as TextMeshProUGUI;
@@ -105,11 +139,19 @@ namespace GradedCardExpander
             var gradeExpansionRarityText = type.GetField("m_GradeExpansionRarityText")?.GetValue(instance) as TextMeshProUGUI;
             var gradeSerialText = type.GetField("m_GradeSerialText")?.GetValue(instance) as TextMeshProUGUI; // "NumberText"
 
-            ApplyTextConfig(gradeNumberText, config.GradeNumberText, is3D);
-            ApplyTextConfig(gradeDescriptionText, config.GradeDescriptionText, is3D);
-            ApplyTextConfig(gradeNameText, config.GradeNameText, is3D);
-            ApplyTextConfig(gradeExpansionRarityText, config.GradeExpansionRarityText, is3D);
-            ApplyTextConfig(gradeSerialText, config.GradeSerialText, is3D);
+            Logger.LogInfo($"Text components found: GradeNumber={gradeNumberText != null}, GradeDesc={gradeDescriptionText != null}, GradeName={gradeNameText != null}, Rarity={gradeExpansionRarityText != null}, Serial={gradeSerialText != null}");
+
+            // Only apply if component exists - critical for binder view
+            if (gradeNumberText != null)
+                ApplyTextConfig(gradeNumberText, config.GradeNumberText, is3D);
+            if (gradeDescriptionText != null)
+                ApplyTextConfig(gradeDescriptionText, config.GradeDescriptionText, is3D);
+            if (gradeNameText != null)
+                ApplyTextConfig(gradeNameText, config.GradeNameText, is3D);
+            if (gradeExpansionRarityText != null)
+                ApplyTextConfig(gradeExpansionRarityText, config.GradeExpansionRarityText, is3D);
+            if (gradeSerialText != null)
+                ApplyTextConfig(gradeSerialText, config.GradeSerialText, is3D);
         }
     }
 }

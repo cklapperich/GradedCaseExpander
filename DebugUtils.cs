@@ -97,7 +97,7 @@ namespace GradedCardExpander
                 info.Append($" [UI] Size: {rectTransform.sizeDelta} Pos: {rectTransform.anchoredPosition}");
             }
 
-            Logger.LogInfo(info.ToString());
+            // Logger.LogInfo(info.ToString());
 
             // Recursively dump children
             for (int i = 0; i < obj.transform.childCount; i++)
@@ -114,9 +114,9 @@ namespace GradedCardExpander
             if (obj == null) return;
 
             string actualHeader = header ?? $"{obj.name} HIERARCHY";
-            Logger.LogInfo($"=== DUMPING {actualHeader} ===");
+            // Logger.LogInfo($"=== DUMPING {actualHeader} ===");
             DumpObjectHierarchy(obj, 0);
-            Logger.LogInfo("=== END HIERARCHY DUMP ===");
+            // Logger.LogInfo("=== END HIERARCHY DUMP ===");
         }
     }
 }

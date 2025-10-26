@@ -10,9 +10,10 @@ CURRENT_USER="$(whoami)"
 SOURCE_DLL="$SCRIPT_DIR/bin/Debug/netstandard2.1/GradedCaseExpander.dll"
 BEPINEX_PLUGINS="$SCRIPT_DIR/BepInEx/plugins/GradedCaseExpander/GradedCaseExpander.dll"
 STEAM_PLUGINS="/home/$CURRENT_USER/.steam/debian-installation/steamapps/common/TCG Card Shop Simulator/BepInEx/plugins/GradedCaseExpander/GradedCaseExpander.dll"
-ZIP_NAME="GradedCaseExpander.zip"
+EXAMPLE_ZIP="$SCRIPT_DIR/GradedCaseExpander-example.zip"
+FOR_USERS_ZIP="$SCRIPT_DIR/GradedCaseExpander-for-users.zip"
+FOR_USERS_DIR="$SCRIPT_DIR/for_users"
 MOD_FOLDER="$SCRIPT_DIR/BepInEx"
-DESTINATION_PATH="$SCRIPT_DIR/GradedCaseExpander.zip"
 
 # Echo paths for verification
 echo "[INFO] Current directory: $(pwd)"
@@ -101,25 +102,53 @@ else
     fi
 fi
 
-# Create zip
-echo "[INFO] Creating zip file..."
-if [ -f "$DESTINATION_PATH" ]; then
-    rm "$DESTINATION_PATH"
+# Create example zip (full package with BepInEx folder structure)
+echo "[INFO] Creating example zip file..."
+if [ -f "$EXAMPLE_ZIP" ]; then
+    rm "$EXAMPLE_ZIP"
 fi
 
 if command -v zip >/dev/null 2>&1; then
     cd "$SCRIPT_DIR"
-    zip -r "$ZIP_NAME" "BepInEx/"
+    zip -r "$EXAMPLE_ZIP" "BepInEx/"
     if [ $? -ne 0 ]; then
-        echo "[ERROR] Zip creation failed!"
+        echo "[ERROR] Example zip creation failed!"
         echo "[DEBUG] Source: $MOD_FOLDER"
-        echo "[DEBUG] Destination: $DESTINATION_PATH"
+        echo "[DEBUG] Destination: $EXAMPLE_ZIP"
         exit 1
     fi
+    echo "[SUCCESS] Created $EXAMPLE_ZIP"
 else
     echo "[ERROR] 'zip' command not found. Please install zip package."
     exit 1
 fi
+
+# Create for-users zip (just the DLL)
+echo "[INFO] Creating for-users zip file..."
+if [ -f "$FOR_USERS_ZIP" ]; then
+    rm "$FOR_USERS_ZIP"
+fi
+
+# Create temporary directory structure for for-users zip
+mkdir -p "$FOR_USERS_DIR/BepInEx/plugins/GradedCaseExpander"
+cp "$SOURCE_DLL" "$FOR_USERS_DIR/BepInEx/plugins/GradedCaseExpander/"
+if [ $? -ne 0 ]; then
+    echo "[ERROR] Failed to copy DLL to for_users directory!"
+    exit 1
+fi
+
+cd "$FOR_USERS_DIR"
+zip -r "$FOR_USERS_ZIP" "BepInEx/"
+if [ $? -ne 0 ]; then
+    echo "[ERROR] For-users zip creation failed!"
+    echo "[DEBUG] Destination: $FOR_USERS_ZIP"
+    exit 1
+fi
+
+# Clean up temporary structure
+rm -rf "$FOR_USERS_DIR/BepInEx"
+cd "$SCRIPT_DIR"
+echo "[SUCCESS] Created $FOR_USERS_ZIP"
 
 # Move log file if it exists
 echo "[INFO] Checking for BepInEx log file..."

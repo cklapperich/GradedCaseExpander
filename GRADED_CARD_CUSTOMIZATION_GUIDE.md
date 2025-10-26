@@ -13,30 +13,38 @@ This guide documents the complete graded card customization system for Card Shop
 **Problem**: When using transparent `GradedCardCase.png`, a black rectangle appeared instead of transparency.
 
 **Root Cause**: The black rectangle was NOT from 3D meshes as initially assumed, but from **UI Image components**:
-- `LabelImageBack` - The actual visible label background
-- `LabelImage` - Hidden/unused label (misleading naming)
+- `LabelImage` - The actual visible label background (used by TextureReplacer and current mod)
+- `LabelImageBack` - Secondary/background label component
+- `LabelImageCompany` - Company branding area
 
-**Game Architecture Contradiction**: Despite the names, `LabelImageBack` is the main visible component, not `LabelImage`. Never trust variable naming in this game.
+**Game Architecture Note**: `LabelImage` is the primary target component, as evidenced by TextureReplacer's implementation and successful modification by the current mod.
 
 ### Complete System Architecture
 
 **3D Mesh Components** (Card3dUIGroup.m_GradedCardGrp):
-- `CardBackMeshBlocker` - Renders card back texture that interferes with graded case display (texture replaced with transparent)
+- `CardBackMeshBlocker` - 3D mesh blocker (purpose unclear, successfully accepts texture changes but doesn't solve card back visibility)
   - **Material**: `MAT_CardBackMesh (Instance)`
-  - **Texture**: `T_CardBackMesh` (confirmed via logging - not CardBack.png as initially assumed)
-  - **Problem**: Causes card back texture to render on front of graded cards
-  - **Solution**: Replace T_CardBackMesh texture with transparent 1x1 texture while keeping mesh for depth testing
-- `Slab_BaseMesh` - Physical case base layer
+  - **Texture**: `T_CardBackMesh` (default, can be changed at runtime)
+  - **Status**: Texture replacement confirmed working (logs show change to DefaultLabelTexture), but card back still visible from another source
+  - **Disabling**: When disabled, allows LabelImageBack to be visible (useful for debugging layer order)
+- `Slab_BaseMesh` - Physical case base layer (SUSPECTED SOURCE OF VISIBLE CARD BACK)
   - **Material**: `trading_card 1 (Instance)`
-  - **Texture**: `trading_card_transparent`
+  - **Texture**: `trading_card_transparent` (misleading name - may actually contain card back texture)
+  - **Theory**: This is likely rendering the card back texture that shows through transparent areas
 - `Slab_TopLayerMesh` - Physical case top layer
   - **Material**: `trading_card (Instance)`
-  - **Texture**: `null`
+  - **Texture**: Empty/null in logs, actual content unknown
+  - **Note**: Could be another candidate for card back rendering
 
 **UI Components** (Canvas-based, UI Layer 5):
-- `LabelImageBack` - **Main visible label background** (615x160 pixels stretched from 32x32 WhiteTile)
-- `LabelImage` - Unused/hidden label component (misleading naming!)
-- `LabelImageCompany` - Company branding area (red colored)
+- `LabelImageBack` - Background label layer (615x160 area)
+  - **Current finding**: Displays sprites differently than LabelImage (suspected different Image.Type settings - possibly Tiled vs Simple)
+  - **Behavior**: When given cropped sprite, displays full 1024x1024 texture off-center with wrapping (incompatible with cropped sprites)
+  - **Original content**: WhiteTile sprite (32x32) stretched to 615x160
+- `LabelImage` - Primary label component (615x160 area)
+  - **Working correctly**: Successfully displays cropped sprites with proper centering and scaling
+  - **Current implementation**: This is the component we're successfully modifying
+- `LabelImageCompany` - Company branding area (red colored, disabled in current implementation)
 
 **Text Components** (TextMeshProUGUI):
 - `m_GradeNumberText` - The grade number (1, 2, 3, etc.)
@@ -45,6 +53,24 @@ This guide documents the complete graded card customization system for Card Shop
 - `m_GradeExpansionRarityText` - Expansion and rarity information
 
 **Key Architecture Insight**: The system combines 3D mesh rendering (physical case structure) with Canvas UI overlays (text labels). The `Card3dUIGroup.EvaluateCardGrade()` method is the central control point for both systems.
+
+### The Card Underneath Problem
+
+**Critical Discovery (2025-09-29)**: The card back texture visible through transparent areas is NOT coming from CardBackMeshBlocker or the graded case components.
+
+**Theory**: The graded case is rendered ON TOP OF the actual card 3D model. When the case has transparent areas, the card mesh underneath shows through. This card mesh is what's rendering T_CardBackMesh.
+
+**Evidence**:
+1. CardBackMeshBlocker texture successfully changes (logs confirm), but card back still visible
+2. Disabling CardBackMeshBlocker allows UI layers to show, but card back persists
+3. The card exists as a separate entity that the graded case overlays
+
+**Implications**: To prevent card back showing through, we need to either:
+- Find and hide/modify the actual card mesh renderer (outside m_GradedCardGrp)
+- Make the graded case fully opaque (no transparent areas)
+- Modify the card's material/texture directly
+
+**Next Steps**: Log parent hierarchy to find the actual card renderer that sits beneath the graded case structure.
 
 ## File Structure
 

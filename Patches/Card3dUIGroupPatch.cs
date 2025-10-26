@@ -3,27 +3,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using BepInEx.Logging;
 
-/* 
-    // this is hwo texturereplacer replaces the gradedcardcase texture. how should WE then replace it? 
-    if ((Object)(object)CardCropGrading == (Object)null)
-    {
-        Texture2D cachedTexture = GetCachedTexture("GradedCardCase");
-        if ((Object)(object)cachedTexture != (Object)null)
-        {
-            int num3 = 271;
-            int num4 = 484;
-            int num5 = 128;
-            int num6 = ((Texture)cachedTexture).height - 208;
-            Texture2D val2 = new Texture2D(num4, num5, (TextureFormat)4, false);
-            Graphics.CopyTexture((Texture)(object)cachedTexture, 0, 0, num3, num6, num4, num5, (Texture)(object)val2, 0, 0, 0, 0);
-            Sprite val3 = TextureToSprite(val2);
-            if ((Object)(object)val3 != (Object)null)
-            {
-                CardCropGrading = val3;
-            }
-        }
-    }
-*/
 namespace GradedCardExpander.Patches
 {
     [HarmonyPatch(typeof(Card3dUIGroup))]
@@ -39,11 +18,48 @@ namespace GradedCardExpander.Patches
             {
                 int grade = cardData.cardGrade;
 
-                // Apply grade-specific sprite or fallback to DefaultLabel
-                ApplyGradeSprite(__instance, grade);
+                // Get both cropped sprite and full texture for this grade
+                Sprite croppedSprite = null;
+                Texture2D fullTexture = null;
 
-                // Clear CardBackMesh to prevent black rectangle
-                // ClearCardBackMesh(__instance);
+                if (Plugin.GradeCroppedSprites.ContainsKey(grade))
+                {
+                    croppedSprite = Plugin.GradeCroppedSprites[grade];
+                    fullTexture = Plugin.GradeTextures[grade];
+                }
+                else if (Plugin.DefaultLabelCroppedSprite != null)
+                {
+                    croppedSprite = Plugin.DefaultLabelCroppedSprite;
+                    fullTexture = Plugin.DefaultLabelTexture;
+                }
+
+                // Apply cropped sprites to both LabelImage and LabelImageBack
+                Transform transform = __instance.m_GradedCardGrp.transform;
+
+                // Apply to LabelImage (current implementation)
+                ApplySpriteToComponent(transform, "LabelImage", croppedSprite);
+
+                // Apply cropped sprite to LabelImageBack
+                Transform componentTransform = transform.Find("LabelImageBack");
+                Image imageComponent = componentTransform.GetComponent<Image>();
+                if (croppedSprite != null)
+                {
+                    imageComponent.sprite = croppedSprite;
+                    imageComponent.color = Color.white;
+                    // Logger.LogInfo($"Applied cropped sprite to LabelImageBack");
+                }
+                else
+                {
+                    imageComponent.color = Color.clear;
+                    // Logger.LogInfo($"No cropped sprite, set LabelImageBack to clear");
+                }
+
+                // Hide company elements like TextureReplacer does
+                HideCompanyElements(transform);
+
+                // Replace textures on both CardBackMeshBlocker and Slab_BaseMesh
+                ApplyCardBackTexture(__instance, fullTexture);
+                //ApplySlabBaseMeshTexture(__instance, fullTexture);
 
                 // Apply text configuration
                 if (Plugin.GradeConfigs.ContainsKey(grade))
@@ -54,88 +70,67 @@ namespace GradedCardExpander.Patches
                 {
                     ApplyTextConfiguration(__instance, Plugin.GradeConfigs[0]);
                 }
-                else
-                {
-                    Logger.LogWarning($"No text configuration found for grade {grade} or fallback");
-                }
             }
         }
 
-        private static void ApplyGradeSprite(Card3dUIGroup instance, int grade)
+        private static void ApplySpriteToComponent(Transform transform, string componentName, Sprite sprite)
         {
-            // Mimic TextureReplacer's exact approach but with grade-specific sprites
-            Transform transform = instance.m_GradedCardGrp.transform;
-            if (transform != null)
-            {
-                Transform labelImageTransform = transform.Find("LabelImage");
-                if (labelImageTransform != null)
-                {
-                    Image labelImageComponent = labelImageTransform.GetComponent<Image>();
-                    if (labelImageComponent != null && labelImageComponent.sprite != null)
-                    {
-                        // Try grade-specific cropped sprite first, then fallback to DefaultLabel cropped sprite
-                        Sprite spriteToApply = null;
-                        if (Plugin.GradeCroppedSprites.ContainsKey(grade))
-                        {
-                            spriteToApply = Plugin.GradeCroppedSprites[grade];
-                        }
-                        else if (Plugin.DefaultLabelCroppedSprite != null)
-                        {
-                            spriteToApply = Plugin.DefaultLabelCroppedSprite;
-                        }
-
-                        if (spriteToApply != null)
-                        {
-                            // Copy the original sprite name like TextureReplacer does
-                            // spriteToApply.name = labelImageComponent.sprite.name;
-
-                            // Replace the sprite
-                            labelImageComponent.sprite = spriteToApply;
-                            labelImageComponent.color = Color.white;
-
-                            // Hide company elements like TextureReplacer does
-                            HideCompanyElements(transform);
-                        }
-                        else
-                        {
-                            Logger.LogWarning($"No sprite available for grade {grade} and no DefaultLabel fallback");
-                        }
-                    }
-                }
-            }
+            Transform componentTransform = transform.Find(componentName);
+            Image imageComponent = componentTransform.GetComponent<Image>();
+            imageComponent.sprite = sprite;
+            imageComponent.color = Color.white;
         }
 
         private static void HideCompanyElements(Transform transform)
         {
-            // TextureReplacer already disables this and we can't re-enable it without maybe doing a post-postfix to texturereplacers setcardui patch??
-            // but we can leave it disabled for now
             // Hide company elements exactly like TextureReplacer does
             Transform labelImageCompany = transform.Find("LabelImageCompany");
-            if (labelImageCompany != null)
-            {
-                labelImageCompany.gameObject.SetActive(false);
-            }
-            // TextureReplacer already disables this and we can't re-enable it without maybe doing a post-postfix to texturereplacers setcardui patch??
-            // but for some reason it still shows up? so we will uncomment...?
+            labelImageCompany.gameObject.SetActive(false);
+
             Transform gradingCompanyText = transform.Find("GradingCompanyText");
-            if (gradingCompanyText != null)
+            gradingCompanyText.gameObject.SetActive(false);
+        }
+
+        private static void ApplySlabBaseMeshTexture(Card3dUIGroup instance, Texture2D fullTexture)
+        {
+            Transform slabBaseMesh = instance.m_GradedCardGrp?.transform.Find("Slab_BaseMesh");
+            Renderer slabRenderer = slabBaseMesh?.GetComponent<Renderer>();
+
+            if (slabRenderer != null)
             {
-                gradingCompanyText.gameObject.SetActive(false);
+
+                if (fullTexture != null)
+                {
+                    slabRenderer.material.mainTexture = (Texture)fullTexture;
+                    // Logger.LogInfo($"Set Slab_BaseMesh texture to: {fullTexture.name}");
+                }
+
+                slabRenderer.material.color = Color.white;
+                // Logger.LogInfo($"After changes - texture: {slabRenderer.material.mainTexture?.name}");
             }
         }
 
-        private static void ClearCardBackMesh(Card3dUIGroup instance)
+        private static void ApplyCardBackTexture(Card3dUIGroup instance, Texture2D fullTexture)
         {
-            // Find and modify CardBackMesh material color
+            // Find CardBackMeshBlocker and assign FULL image texture
             Transform cardBackMesh = instance.m_GradedCardGrp?.transform.Find("CardBackMeshBlocker");
             Renderer cardBackRenderer = cardBackMesh?.GetComponent<Renderer>();
 
-            if (cardBackRenderer != null && cardBackRenderer.material != null)
-            {   // important! T_CardBackMesh.png is replaced with a transparent PNG, for testing, outside of this mode.
-                // disabling this causes REALLY weird issues with transparency. Setting this to false does cause the right parts of the label to be transparent, but if you have multiple overlapping cards in your hand, the labels render through each other!
-                cardBackRenderer.enabled=true; 
-                cardBackRenderer.material.color = Color.clear; // BUT this doesnt seem to do anything? You still get a black rectangle.
-            }
+            if (cardBackRenderer != null)
+            {
+             
+                // Try to replace the texture with our custom one
+                if (fullTexture != null)
+                {
+                    cardBackRenderer.material.mainTexture = (Texture)fullTexture;
+                    // Logger.LogInfo($"Set texture to: {fullTexture.name}");
+                }
+
+                // DEBUG: Color CardBackMeshBlocker bright blue (will multiply with texture)
+                cardBackRenderer.material.color = Color.blue;
+
+                // Logger.LogInfo($"After changes - texture: {cardBackRenderer.material.mainTexture?.name}, color: {cardBackRenderer.material.color}");
+            }       
         }
 
         private static void ApplyTextConfiguration(Card3dUIGroup instance, GradedCardGradeConfig config)

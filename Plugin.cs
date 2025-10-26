@@ -21,6 +21,7 @@ namespace GradedCardExpander
         public string Text { get; set; } = null;
         public Color? OutlineColor { get; set; } = null;
         public float? OutlineWidth { get; set; } = null;
+        public float? MaxTextWidthPixels { get; set; } = null;
     }
 
     public class GradedCardGradeConfig
@@ -53,14 +54,18 @@ namespace GradedCardExpander
         {
             if (!File.Exists(_configFilePath))
             {
-                Plugin.Logger.LogWarning($"DefaultLabel.txt file does not exist: {_configFilePath}");
+                // Plugin.Logger.LogWarning($"DefaultLabel.txt file does not exist: {_configFilePath}");
                 return;
             }
 
             // Note: LoadTextConfig moved to Plugin class for grade-specific loading
         }
     }
-            // Debug logging for SerialText position discovery - don't apply position changes yetaseExpander";
+
+    public static class MyPluginInfo
+    {
+        public const string PLUGIN_GUID = "GradedCaseExpander";
+        public const string PLUGIN_NAME = "GradedCaseExpander";
         public const string PLUGIN_VERSION = "1.1.0";
     }
 
@@ -71,7 +76,6 @@ namespace GradedCardExpander
     {
         internal static new ManualLogSource Logger;
         internal static string PluginPath;
-            // Debug logging for SerialText position discovery - don't apply position changes yet
         internal static GradedCardConfig GradedConfig = new GradedCardConfig();
         internal static Dictionary<int, Sprite> GradeSprites = new Dictionary<int, Sprite>();
         internal static Dictionary<int, Texture2D> GradeTextures = new Dictionary<int, Texture2D>();
@@ -83,6 +87,10 @@ namespace GradedCardExpander
         internal static Texture2D DefaultLabelTexture => GradeTextures.ContainsKey(0) ? GradeTextures[0] : null;
         internal static Sprite DefaultLabelSprite => GradeSprites.ContainsKey(0) ? GradeSprites[0] : null;
         internal static Sprite DefaultLabelCroppedSprite => GradeCroppedSprites.ContainsKey(0) ? GradeCroppedSprites[0] : null;
+
+        // Full textures for CardBackMeshBlocker (same as GradeTextures but more explicit naming)
+        internal static Dictionary<int, Texture2D> GradeFullTextures => GradeTextures;
+        internal static Texture2D DefaultLabelFullTexture => DefaultLabelTexture;
 
         // Debug config entries
         internal static ConfigEntry<bool> DebugCardBackMeshBlocker;
@@ -352,10 +360,10 @@ namespace GradedCardExpander
                                 {
                                     currentTextConfig.Color = color;
                                 }
-                                else
-                                {
-                                    Logger.LogWarning($"Failed to parse color '{value}' in {configFile}");
-                                }
+                                // else
+                                // {
+                                //     Logger.LogWarning($"Failed to parse color '{value}' in {configFile}");
+                                // }
                                 break;
                             case "FontSize":
                                 if (float.TryParse(value, out float fontSize))
@@ -369,10 +377,10 @@ namespace GradedCardExpander
                                 {
                                     currentTextConfig.Font = LoadedFonts[value.ToLower()];
                                 }
-                                else
-                                {
-                                    Logger.LogWarning($"Font '{value}' not found in loaded fonts. Available fonts: {string.Join(", ", LoadedFonts.Keys)}");
-                                }
+                                // else
+                                // {
+                                //     Logger.LogWarning($"Font '{value}' not found in loaded fonts. Available fonts: {string.Join(", ", LoadedFonts.Keys)}");
+                                // }
                                 break;
                             case "OffsetX":
                                 if (float.TryParse(value, out float offsetX))
@@ -410,15 +418,21 @@ namespace GradedCardExpander
                                 {
                                     currentTextConfig.OutlineColor = outlineColor;
                                 }
-                                else
-                                {
-                                    Logger.LogWarning($"Failed to parse outline color '{value}' in {configFile}");
-                                }
+                                // else
+                                // {
+                                //     Logger.LogWarning($"Failed to parse outline color '{value}' in {configFile}");
+                                // }
                                 break;
                             case "OutlineWidth":
                                 if (float.TryParse(value, out float outlineWidth))
                                 {
                                     currentTextConfig.OutlineWidth = outlineWidth;
+                                }
+                                break;
+                            case "MaxTextWidthPixels":
+                                if (float.TryParse(value, out float maxTextWidthPixels))
+                                {
+                                    currentTextConfig.MaxTextWidthPixels = maxTextWidthPixels;
                                 }
                                 break;
                         }
