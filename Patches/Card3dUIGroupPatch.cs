@@ -2,6 +2,7 @@ using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UI;
 using BepInEx.Logging;
+/* THIS METHOD PATCHES THE 3D GRADED CARDS */
 
 namespace GradedCardExpander.Patches
 {

@@ -2,6 +2,7 @@ using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UI;
 using BepInEx.Logging;
+/* THIS METHOD PATCHES THE 2D GRADED CARDS (ONLY SEEN ON PRICE DISPLAY SCREEN) */
 
 namespace GradedCardExpander.Patches
 {
@@ -10,8 +11,8 @@ namespace GradedCardExpander.Patches
     public class ShowGradedCardCasePatch
     {
         private static readonly ManualLogSource Logger = BepInEx.Logging.Logger.CreateLogSource("ShowGradedCardCasePatch");
-    
-        static void Postf ix(CardUI __instance, bool isShow)
+
+        static void Postfix(CardUI __instance, bool isShow)
         {
             if (!isShow || __instance.m_GradedCardCaseGrp == null)
                 return;
@@ -45,6 +46,8 @@ namespace GradedCardExpander.Patches
                     {
                         gradedCardCaseImage.sprite = spriteToApply;
                         gradedCardCaseImage.color = Color.white;
+
+                        // Logger.LogInfo($"Applied grade {grade} sprite to CardUI GradedCardCase");
                     }
                 }
             }

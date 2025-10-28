@@ -45,11 +45,9 @@ namespace GradedCardExpander
                 return;
             }
 
-            Logger.LogInfo($"=== Applying config to {text.name} (is3D={is3D}) ===");
-
             // Enable rich text and word wrapping for all text components
             text.richText = true;
-            text.enableWordWrapping = true;
+            //text.enableWordWrapping = true;
 
             if (config.Color.HasValue)
             {
@@ -64,6 +62,17 @@ namespace GradedCardExpander
             if (config.Font != null)
             {
                 text.font = config.Font;
+
+                // Fix: Mobile shader doesn't support outlines properly
+                // Force the standard Distance Field shader
+                if (text.fontMaterial.shader.name.Contains("Mobile"))
+                {
+                    var standardShader = Shader.Find("TextMeshPro/Distance Field");
+                    if (standardShader != null)
+                    {
+                        text.fontMaterial.shader = standardShader;
+                    }
+                }
             }
 
             // Select the appropriate position offset based on is3D flag
@@ -89,22 +98,13 @@ namespace GradedCardExpander
             // Handle outline settings - must set on component properties, not material
             if (config.OutlineColor.HasValue)
             {
-                Logger.LogInfo($"=== Setting outline color on {text.name} to {config.OutlineColor.Value} ===");
                 text.outlineColor = config.OutlineColor.Value;
             }
 
             if (config.OutlineWidth.HasValue)
             {
                 float clampedWidth = Mathf.Clamp(config.OutlineWidth.Value, 0.0f, 1.0f);
-                Logger.LogInfo($"=== Setting outline width on {text.name} to {clampedWidth} ===");
                 text.outlineWidth = clampedWidth;
-            }
-
-            // Update the vertex colors to apply outline changes
-            if (config.OutlineColor.HasValue || config.OutlineWidth.HasValue)
-            {
-                Logger.LogInfo($"Calling UpdateVertexData to apply outline changes");
-                text.UpdateVertexData(TMPro.TMP_VertexDataUpdateFlags.All);
             }
 
             // Force mesh update to ensure all changes are applied immediately
