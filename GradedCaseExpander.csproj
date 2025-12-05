@@ -12,7 +12,7 @@
       https://nuget.bepinex.dev/v3/index.json;
       https://nuget.samboy.dev/v3/index.json
     </RestoreAdditionalProjectSources>
-    <RootNamespace>ArtExpander</RootNamespace>
+    <RootNamespace>GradedCaseExpander</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -35,6 +35,9 @@
     </Reference>
     <Reference Include="UnityEngine.UI">
       <HintPath>lib\UnityEngine.UI.dll</HintPath>
+    </Reference>
+    <Reference Include="TextureReplacer">
+      <HintPath>lib\TextureReplacer.dll</HintPath>
     </Reference>
     <Compile Remove="references/**/*.cs" />
     <Compile Remove="reference_code/**/*.cs" />

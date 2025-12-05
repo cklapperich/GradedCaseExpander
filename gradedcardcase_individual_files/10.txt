@@ -3,6 +3,7 @@ Color=#FFFFFF
 FontSize=24
 PositionX=0
 PositionY=0
+MaxTextWidthPixels=200
 
 [GradeDescriptionText]
 Color=#FFFFFF

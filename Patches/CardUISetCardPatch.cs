@@ -1,6 +1,8 @@
 using System;
+using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
+using TMPro;
 
 namespace GradedCardExpander.Patches
 {
@@ -30,13 +32,37 @@ namespace GradedCardExpander.Patches
             }
         }
 
-        static void Prefix(CardData cardData)
+        static void Prefix(CardData cardData, CardUI __instance)
         {
+            // Skip processing for nested FullArt cards to prevent double-processing and sprite contamination
+            var isNestedField = typeof(CardUI).GetField("m_IsNestedFullArt", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (isNestedField != null)
+            {
+                bool isNested = (bool)isNestedField.GetValue(__instance);
+                if (isNested)
+                {
+                    // Skip setting current card data for nested calls
+                    return;
+                }
+            }
+
             CardDataTracker.SetCurrentCard(cardData);
         }
 
         static void Postfix(CardUI __instance)
         {
+            // Only clear if this wasn't a nested call
+            var isNestedField = typeof(CardUI).GetField("m_IsNestedFullArt", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (isNestedField != null)
+            {
+                bool isNested = (bool)isNestedField.GetValue(__instance);
+                if (isNested)
+                {
+                    // Skip clearing for nested calls
+                    return;
+                }
+            }
+
             CardDataTracker.ClearCurrentCard();
         }
     }
