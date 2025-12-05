@@ -12,54 +12,52 @@ namespace GradedCardExpander.Patches
 
         static void Postfix(Card3dUIGroup __instance, CardData cardData)
         {
-            // Disable the CardBackMeshBlocker renderer to prevent card back texture interference
-            Transform cardBackBlocker = __instance.m_GradedCardGrp?.transform.Find("CardBackMeshBlocker");
-            if (cardBackBlocker?.GetComponent<Renderer>() is Renderer renderer)
-                renderer.enabled = false;
-
             // Apply grade-specific customization
-            if (__instance.m_GradedCardGrp != null && cardData != null)
+            if (__instance.m_GradedCardGrp == null || cardData == null)
             {
-                int grade = cardData.cardGrade;
+                return;
+            }
+            int grade = cardData.cardGrade;
+            Transform cullGrp = __instance.m_GradedCardGrp.transform.Find("GradingSlabCullGrp");
+            if (cullGrp == null) return;
 
-                var labelBack = __instance.m_GradedCardGrp.transform.Find("LabelImageBack")?.GetComponent<UnityEngine.UI.Image>();
-                var labelImage = __instance.m_GradedCardGrp.transform.Find("LabelImage")?.GetComponent<UnityEngine.UI.Image>();
+            // Disable the CardBackMeshBlocker renderer - is this necessary? Investigate.
+            if (cullGrp.Find("CardBackMeshBlocker")?.GetComponent<Renderer>() is Renderer renderer)
+                renderer.enabled = false;
+                
+            var labelBack = cullGrp.Find("LabelImageBack")?.GetComponent<UnityEngine.UI.Image>();
+            var labelImage = cullGrp.transform.Find("LabelImage")?.GetComponent<UnityEngine.UI.Image>();
 
-                // Apply grade-specific sprite or fallback
-                if (labelBack != null)
-                {
-                    if (Plugin.GradeSprites.ContainsKey(grade))
-                    {
-                        labelBack.sprite = Plugin.GradeSprites[grade];
-                    }
-                    else if (Plugin.GradeSprites.ContainsKey(0)) // Fallback to GradedCardCase.png
-                    {
-                        labelBack.sprite = Plugin.GradeSprites[0];
-                    }
-                    else
-                    {
-                        labelBack.enabled = false;
-                        return;
-                    }
+            // Apply grade-specific sprite or fallback
+            if (Plugin.GradeSprites.ContainsKey(grade))
+            {
+                labelBack.sprite = Plugin.GradeSprites[grade];
+            }
+            else if (Plugin.GradeSprites.ContainsKey(0)) // Fallback to GradedCardCase.png
+            {
+                labelBack.sprite = Plugin.GradeSprites[0];
+            }
+            else
+            {
+                labelBack.enabled = false;
+                return;
+            }
+            labelBack.color = Color.white;
+            labelBack.type = UnityEngine.UI.Image.Type.Simple;
+            labelBack.preserveAspect = false;
+        
+            // Disable unused label
+            if (labelImage != null)
+                labelImage.enabled = false;
 
-                    labelBack.color = Color.white;
-                    labelBack.type = UnityEngine.UI.Image.Type.Simple;
-                    labelBack.preserveAspect = false;
-                }
-
-                // Disable unused label
-                if (labelImage != null)
-                    labelImage.enabled = false;
-
-                // Apply text configuration
-                if (Plugin.GradeConfigs.ContainsKey(grade))
-                {
-                    ApplyTextConfiguration(__instance, Plugin.GradeConfigs[grade]);
-                }
-                else if (Plugin.GradeConfigs.ContainsKey(0)) // Fallback to GradedCardCase.txt
-                {
-                    ApplyTextConfiguration(__instance, Plugin.GradeConfigs[0]);
-                }
+            // Apply text configuration
+            if (Plugin.GradeConfigs.ContainsKey(grade))
+            {
+                ApplyTextConfiguration(__instance, Plugin.GradeConfigs[grade]);
+            }
+            else if (Plugin.GradeConfigs.ContainsKey(0)) // Fallback to GradedCardCase.txt
+            {
+                ApplyTextConfiguration(__instance, Plugin.GradeConfigs[0]);
             }
         }
 

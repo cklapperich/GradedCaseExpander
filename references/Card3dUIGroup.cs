@@ -1,10 +1,13 @@
 using I2.Loc;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class Card3dUIGroup : MonoBehaviour
 {
     public CardUI m_CardUI;
+
+    public Animation m_Anim;
 
     public GameObject m_CardFrontMeshPos;
 
@@ -14,11 +17,15 @@ public class Card3dUIGroup : MonoBehaviour
 
     public GameObject m_GradedCardGrp;
 
+    public GameObject m_GradedCardCullGrp;
+
     public GameObject m_SlabTopLayerMesh;
 
     public Transform m_ScaleGrp;
 
     public Transform m_CardUIAnimGrp;
+
+    public Transform m_BtmLayerParentGrp;
 
     public TextMeshProUGUI m_CardCountText;
 
@@ -32,7 +39,11 @@ public class Card3dUIGroup : MonoBehaviour
 
     public TextMeshProUGUI m_GradeSerialText;
 
+    public Image m_GradedCardBrightnessControl;
+
     public bool m_IgnoreCulling;
+
+    private bool m_AlwaysCulling;
 
     private bool m_IsActive;
 
@@ -72,6 +83,12 @@ public class Card3dUIGroup : MonoBehaviour
         m_CardUI.SetBrightness(CSingleton<LightManager>.Instance.GetBrightness());
     }
 
+    public void SetSimplifyCardDistanceCull(bool isCull)
+    {
+        m_CardUI.ShowSimplifiedCullingGradedCardCase(isCull);
+        m_GradedCardCullGrp.SetActive(!isCull);
+    }
+
     public void SetVisibility(bool isVisible)
     {
         ((Component)this).gameObject.SetActive(isVisible);
@@ -81,6 +98,10 @@ public class Card3dUIGroup : MonoBehaviour
     {
         if (cardData.cardGrade > 0)
         {
+            if (m_IgnoreCulling)
+            {
+                m_GradedCardCullGrp.SetActive(true);
+            }
             m_GradedCardGrp.SetActive(true);
             ((TMP_Text)m_GradeNumberText).text = cardData.cardGrade.ToString();
             ((TMP_Text)m_GradeDescriptionText).text = GameInstance.GetCardGradeString(cardData.cardGrade);
@@ -118,6 +139,7 @@ public class Card3dUIGroup : MonoBehaviour
     public void DisableCard()
     {
         m_IsActive = false;
+        m_SlabTopLayerMesh.gameObject.SetActive(true);
         Card3dUISpawner.DisableCard(this);
     }
 
@@ -208,5 +230,27 @@ public class Card3dUIGroup : MonoBehaviour
     public bool IsActive()
     {
         return m_IsActive;
+    }
+
+    public void CheckValidCard3dUI()
+    {
+        if (!m_CardUI.IsCard3dUIGroupSet())
+        {
+            m_CardUI.InitCard3dUIGroup(this);
+        }
+    }
+
+    public void SetAlwaysCulling(bool alwaysCulling, bool setVisibilityInstant = true)
+    {
+        if (setVisibilityInstant)
+        {
+            ((Component)m_CardUIAnimGrp).gameObject.SetActive(!alwaysCulling);
+        }
+        m_AlwaysCulling = alwaysCulling;
+    }
+
+    public bool GetAlwaysCulling()
+    {
+        return m_AlwaysCulling;
     }
 }
