@@ -23,43 +23,28 @@ namespace GradedCardExpander.Patches
                 return;
 
             int grade = cardData.cardGrade;
+            string expansionName = cardData.expansionType.ToString();
+
+            // Get assets using new helper (checks company, expansion, then default)
+            Sprite spriteToApply = Plugin.GetSpriteForCard(cardData, grade, expansionName);
+            GradedCardGradeConfig config = Plugin.GetConfigForCard(cardData, grade, expansionName);
 
             // Find the main GradedCardCase image component
             Transform gradedCardCaseTransform = __instance.m_GradedCardCaseGrp.transform;
             if (gradedCardCaseTransform != null)
             {
                 Image gradedCardCaseImage = gradedCardCaseTransform.GetComponent<Image>();
-                if (gradedCardCaseImage != null)
+                if (gradedCardCaseImage != null && spriteToApply != null)
                 {
-                    // Apply grade-specific non-cropped sprite or fallback to DefaultLabel
-                    Sprite spriteToApply = null;
-                    if (Plugin.GradeSprites.ContainsKey(grade))
-                    {
-                        spriteToApply = Plugin.GradeSprites[grade];
-                    }
-                    else if (Plugin.DefaultLabelSprite != null)
-                    {
-                        spriteToApply = Plugin.DefaultLabelSprite;
-                    }
-
-                    if (spriteToApply != null)
-                    {
-                        gradedCardCaseImage.sprite = spriteToApply;
-                        gradedCardCaseImage.color = Color.white;
-
-                        // Logger.LogInfo($"Applied grade {grade} sprite to CardUI GradedCardCase");
-                    }
+                    gradedCardCaseImage.sprite = spriteToApply;
+                    gradedCardCaseImage.color = Color.white;
                 }
             }
 
             // Apply text configuration
-            if (Plugin.GradeConfigs.ContainsKey(grade))
+            if (config != null)
             {
-                GradedCardTextUtils.ApplyTextConfiguration(__instance, Plugin.GradeConfigs[grade], is3D: false);
-            }
-            else if (Plugin.GradeConfigs.ContainsKey(0)) // Fallback to DefaultLabel.txt
-            {
-                GradedCardTextUtils.ApplyTextConfiguration(__instance, Plugin.GradeConfigs[0], is3D: false);
+                GradedCardTextUtils.ApplyTextConfiguration(__instance, config, is3D: false);
             }
         }
     }

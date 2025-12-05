@@ -18,21 +18,12 @@ namespace GradedCardExpander.Patches
             if (__instance.m_GradedCardGrp != null && cardData != null && cardData.cardGrade > 0)
             {
                 int grade = cardData.cardGrade;
+                string expansionName = cardData.expansionType.ToString();
 
-                // Get both cropped sprite and full texture for this grade
-                Sprite croppedSprite = null;
-                Texture2D fullTexture = null;
-
-                if (Plugin.GradeCroppedSprites.ContainsKey(grade))
-                {
-                    croppedSprite = Plugin.GradeCroppedSprites[grade];
-                    fullTexture = Plugin.GradeTextures[grade];
-                }
-                else if (Plugin.DefaultLabelCroppedSprite != null)
-                {
-                    croppedSprite = Plugin.DefaultLabelCroppedSprite;
-                    fullTexture = Plugin.DefaultLabelTexture;
-                }
+                // Get assets using new helper (checks company, expansion, then default)
+                Sprite croppedSprite = Plugin.GetCroppedSpriteForCard(cardData, grade, expansionName);
+                Texture2D fullTexture = Plugin.GetTextureForCard(cardData, grade, expansionName);
+                GradedCardGradeConfig config = Plugin.GetConfigForCard(cardData, grade, expansionName);
 
                 // Apply cropped sprites to both LabelImage and LabelImageBack
                 Transform transform = __instance.m_GradedCardGrp.transform;
@@ -59,13 +50,9 @@ namespace GradedCardExpander.Patches
                 HideCompanyElements(cullGrp);
 
                 // Apply text configuration
-                if (Plugin.GradeConfigs.ContainsKey(grade))
+                if (config != null)
                 {
-                    ApplyTextConfiguration(__instance, Plugin.GradeConfigs[grade]);
-                }
-                else if (Plugin.GradeConfigs.ContainsKey(0)) // Fallback to DefaultLabel.txt
-                {
-                    ApplyTextConfiguration(__instance, Plugin.GradeConfigs[0]);
+                    ApplyTextConfiguration(__instance, config);
                 }
             }
         }
