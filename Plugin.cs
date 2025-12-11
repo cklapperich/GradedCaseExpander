@@ -10,37 +10,6 @@ using System.Collections;
 using System.Reflection;
 using TMPro;
 
-
-// STEP 0 - DONE: GradingOverhaulCompat class provides soft dependency via reflection - DONE
-// STEP 1: WE NEED A FUNCTION THAT READS IN AN ARBITRARY FOLDER FROM THE Pluginpath DIRECTORY, AND LOADS ALL THE CONFIGS FOUND THERE. - DONE
-// STEP 2: ITERATE OVER EVERY FOLDER IN THE PLUGINS DIR AND LOAD THE SPRITES AND CONFIGS INTO DICTIONARIES. An image or config can be specific to a folder, a grade, or specific to both. - DONE
-
-// STEP 3: Function to return correct sprites for simplicity.
-
-// first we need 
-// to get a company 'stamp' use this. 'company' is just an enum, need to use company.tostring()
-// CompanyStampManager.TryGetCompany(cardData, out var company);
-// Goal: make a new function, given a cardData and a grade, attempts to get the company. If it fails, return based on grade as in @card3duigrouppatch.cs
-// the new function should return a tuple of the sprite and cropped sprite.
-// see this old code as reference:
-/*
-                // Get both cropped sprite and full texture for this grade
-                Sprite croppedSprite = null;
-                Texture2D fullTexture = null;
-
-                if (Plugin.GradeCroppedSprites.ContainsKey(grade))
-                {
-                    croppedSprite = Plugin.GradeCroppedSprites[grade];
-                    fullTexture = Plugin.GradeTextures[grade];
-                }
-                else if (Plugin.DefaultLabelCroppedSprite != null)
-                {
-                    croppedSprite = Plugin.DefaultLabelCroppedSprite;
-                    fullTexture = Plugin.DefaultLabelTexture;
-                }
-*/
-// but now we want to FIRST attempt to return the 
-
 namespace GradedCardExpander
 {
     public static class MyPluginInfo
@@ -53,7 +22,7 @@ namespace GradedCardExpander
     [BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
     [BepInProcess("Card Shop Simulator.exe")]
     [BepInDependency("shaklin.TextureReplacer", BepInDependency.DependencyFlags.SoftDependency)]
-    [BepInDependency("TCGCardShopSimulator.GradingOverhaul", BepInDependency.DependencyFlags.SoftDependency)]
+    [BepInDependency("munch.gradingoverhaul", BepInDependency.DependencyFlags.SoftDependency)]
     public class Plugin : BaseUnityPlugin
     {
         internal static new ManualLogSource Logger;
@@ -62,26 +31,18 @@ namespace GradedCardExpander
         internal static Dictionary<int, Texture2D> GradeTextures = new Dictionary<int, Texture2D>();
         internal static Dictionary<int, Sprite> GradeCroppedSprites = new Dictionary<int, Sprite>();
         internal static Dictionary<int, GradedCardGradeConfig> GradeConfigs = new Dictionary<int, GradedCardGradeConfig>();
-        // Fonts now managed by FontLoader - this property provides backwards compatibility
-        internal static Dictionary<string, TMP_FontAsset> LoadedFonts => FontLoader.LoadedFonts;
 
-        // New folder-based asset storage: key is folder name ("" for root, "PSA", "BGS", etc.)
+        // folder-based asset storage: key is folder name ("" for root, "PSA", "BGS", etc.)
         internal static Dictionary<string, GradeAssets> FolderAssets = new Dictionary<string, GradeAssets>();
-
-        // Convenience properties for accessing default (grade 0) assets
-        internal static Texture2D DefaultLabelTexture => GradeTextures.ContainsKey(0) ? GradeTextures[0] : null;
-        internal static Sprite DefaultLabelSprite => GradeSprites.ContainsKey(0) ? GradeSprites[0] : null;
-        internal static Sprite DefaultLabelCroppedSprite => GradeCroppedSprites.ContainsKey(0) ? GradeCroppedSprites[0] : null;
-
-        // Full textures for CardBackMeshBlocker (same as GradeTextures but more explicit naming)
-        internal static Dictionary<int, Texture2D> GradeFullTextures => GradeTextures;
-        internal static Texture2D DefaultLabelFullTexture => DefaultLabelTexture;
         private readonly Harmony harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
 
         private void Awake()
         {
             Logger = base.Logger;
             PluginPath = Path.GetDirectoryName(Info.Location);
+
+            // Load fonts FIRST before processing configuration files
+            FontLoader.LoadFonts(PluginPath);
 
             // Load root folder as "_default"
             FolderAssets["_default"] = GradeAssets.LoadFromFolder(PluginPath);
@@ -93,28 +54,42 @@ namespace GradedCardExpander
                 FolderAssets[folderName] = GradeAssets.LoadFromFolder(subdir);
             }
 
+            // Wire up parent relationships: all expansion folders inherit from _default
+            if (FolderAssets.TryGetValue("_default", out var defaultAssets))
+            {
+                foreach (var kvp in FolderAssets)
+                {
+                    if (kvp.Key != "_default")
+                        kvp.Value.Parent = defaultAssets;
+                }
+            }
+
+            // Write asset log for debugging
+            //string logPath = Path.Combine(PluginPath, "GradedCaseExpander_Assets.log");
+            //if (File.Exists(logPath)) File.Delete(logPath);
+            // foreach (var kvp in FolderAssets)
+            // {
+            //     kvp.Value.LogToFile(logPath, kvp.Key);
+            // }
+
             harmony.PatchAll();
         }
 
         /// <summary>
         /// Gets the appropriate GradeAssets for a card based on company, expansion, or default.
         /// Priority: Company (from GradingOverhaul) → Expansion name → "_default"
+        /// Returns null if no matching assets found (patches should not modify anything).
         /// </summary>
         /// <param name="cardData">The card data object (can be null)</param>
         /// <param name="expansionName">Optional expansion name to check (e.g., from cardData.expansionType.ToString())</param>
-        /// <returns>The matching GradeAssets, or null if none found</returns>
+        /// <returns>The matching GradeAssets with assets, or null if none found</returns>
         public static GradeAssets GetAssetsForCard(object cardData, string expansionName = null)
         {
-            // 1. Try company from GradingOverhaul
-            if (cardData != null && GradingOverhaulCompat.IsAvailable)
+            if (cardData==null) return null;
+            string company = GradingOverhaulCompat.TryGetCompany(cardData);
+            if (company!="Vanilla" && FolderAssets.TryGetValue(company, out var companyAssets) && companyAssets.HasAssets)
             {
-                if (GradingOverhaulCompat.TryGetCompany(cardData, out string company) && !string.IsNullOrEmpty(company))
-                {
-                    if (FolderAssets.TryGetValue(company, out var companyAssets) && companyAssets.HasAssets)
-                    {
-                        return companyAssets;
-                    }
-                }
+                return companyAssets;
             }
 
             // 2. Try expansion name
@@ -126,12 +101,13 @@ namespace GradedCardExpander
                 }
             }
 
-            // 3. Fall back to default
-            if (FolderAssets.TryGetValue("_default", out var defaultAssets))
+            // 3. Fall back to default - but ONLY if it has assets
+            if (FolderAssets.TryGetValue("_default", out var defaultAssets) && defaultAssets.HasAssets)
             {
                 return defaultAssets;
             }
 
+            // No matching assets found - patches should not modify anything
             return null;
         }
 

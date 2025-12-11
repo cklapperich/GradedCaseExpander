@@ -32,22 +32,10 @@ namespace GradedCardExpander
         /// </summary>
         public static void ApplyTextConfig(TextMeshProUGUI text, GradedCardTextConfig config, bool is3D = false)
         {
-            // Null check - critical for binder view where text components may not exist
-            if (text == null)
-            {
-                Logger.LogWarning($"ApplyTextConfig called with null text component");
-                return;
-            }
+            if (text == null) return;
+            if (config == null) return;
 
-            if (config == null)
-            {
-                Logger.LogWarning($"ApplyTextConfig called with null config for {text.name}");
-                return;
-            }
-
-            // Enable rich text and word wrapping for all text components
             text.richText = true;
-            //text.enableWordWrapping = true;
 
             if (config.Color.HasValue)
             {
@@ -55,7 +43,6 @@ namespace GradedCardExpander
             }
             if (config.FontSize.HasValue)
             {
-                // Disable auto-sizing if it's enabled, which could override manual font size
                 text.enableAutoSizing = false;
                 text.fontSize = config.FontSize.Value;
             }
@@ -119,17 +106,13 @@ namespace GradedCardExpander
         {
             if (instance == null)
             {
-                Logger.LogWarning($"ApplyTextConfiguration called with null instance");
                 return;
             }
 
             if (config == null)
             {
-                Logger.LogWarning($"ApplyTextConfiguration called with null config");
                 return;
             }
-
-            Logger.LogInfo($"=== ApplyTextConfiguration on {instance.GetType().Name} (is3D={is3D}) ===");
 
             var type = instance.GetType();
 
@@ -138,8 +121,6 @@ namespace GradedCardExpander
             var gradeNameText = type.GetField("m_GradeNameText")?.GetValue(instance) as TextMeshProUGUI;
             var gradeExpansionRarityText = type.GetField("m_GradeExpansionRarityText")?.GetValue(instance) as TextMeshProUGUI;
             var gradeSerialText = type.GetField("m_GradeSerialText")?.GetValue(instance) as TextMeshProUGUI; // "NumberText"
-
-            Logger.LogInfo($"Text components found: GradeNumber={gradeNumberText != null}, GradeDesc={gradeDescriptionText != null}, GradeName={gradeNameText != null}, Rarity={gradeExpansionRarityText != null}, Serial={gradeSerialText != null}");
 
             // Only apply if component exists - critical for binder view
             if (gradeNumberText != null)

@@ -20,10 +20,17 @@ namespace GradedCardExpander.Patches
                 int grade = cardData.cardGrade;
                 string expansionName = cardData.expansionType.ToString();
 
-                // Get assets using new helper (checks company, expansion, then default)
-                Sprite croppedSprite = Plugin.GetCroppedSpriteForCard(cardData, grade, expansionName);
-                Texture2D fullTexture = Plugin.GetTextureForCard(cardData, grade, expansionName);
-                GradedCardGradeConfig config = Plugin.GetConfigForCard(cardData, grade, expansionName);
+                // Get assets for this card - if none found, don't modify anything
+                GradeAssets assets = Plugin.GetAssetsForCard(cardData, expansionName);
+                if (assets == null)
+                {
+                    // No assets for this expansion/company - leave card unmodified
+                    return;
+                }
+
+                Sprite croppedSprite = assets.GetCroppedSprite(grade);
+                Texture2D fullTexture = assets.GetTexture(grade);
+                GradedCardGradeConfig config = assets.GetConfig(grade);
 
                 // Apply cropped sprites to both LabelImage and LabelImageBack
                 Transform transform = __instance.m_GradedCardGrp.transform;
@@ -98,7 +105,6 @@ namespace GradedCardExpander.Patches
             if (fullTexture != null)
             {
                 cardBackRenderer.material.mainTexture = (Texture)fullTexture;
-                // Logger.LogInfo($"Set texture to: {fullTexture.name}");
             }  
         }
 

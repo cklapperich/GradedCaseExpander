@@ -72,6 +72,7 @@ namespace GradedCardExpander
     public class GradeAssets
     {
         public string FolderPath { get; private set; }
+        public GradeAssets Parent { get; set; } = null;
 
         public Dictionary<int, Texture2D> Textures { get; } = new Dictionary<int, Texture2D>();
         public Dictionary<int, Sprite> Sprites { get; } = new Dictionary<int, Sprite>();
@@ -98,7 +99,7 @@ namespace GradedCardExpander
         }
 
         /// <summary>
-        /// Gets the texture for a grade, falling back to grade 0 (DefaultLabel) if not found.
+        /// Gets the texture for a grade, falling back to grade 0 (DefaultLabel) if not found, then to Parent.
         /// </summary>
         public Texture2D GetTexture(int grade)
         {
@@ -106,11 +107,11 @@ namespace GradedCardExpander
                 return texture;
             if (Textures.TryGetValue(0, out var defaultTexture))
                 return defaultTexture;
-            return null;
+            return Parent?.GetTexture(grade);
         }
 
         /// <summary>
-        /// Gets the sprite for a grade, falling back to grade 0 (DefaultLabel) if not found.
+        /// Gets the sprite for a grade, falling back to grade 0 (DefaultLabel) if not found, then to Parent.
         /// </summary>
         public Sprite GetSprite(int grade)
         {
@@ -118,11 +119,11 @@ namespace GradedCardExpander
                 return sprite;
             if (Sprites.TryGetValue(0, out var defaultSprite))
                 return defaultSprite;
-            return null;
+            return Parent?.GetSprite(grade);
         }
 
         /// <summary>
-        /// Gets the cropped sprite for a grade, falling back to grade 0 (DefaultLabel) if not found.
+        /// Gets the cropped sprite for a grade, falling back to grade 0 (DefaultLabel) if not found, then to Parent.
         /// </summary>
         public Sprite GetCroppedSprite(int grade)
         {
@@ -130,11 +131,11 @@ namespace GradedCardExpander
                 return sprite;
             if (CroppedSprites.TryGetValue(0, out var defaultSprite))
                 return defaultSprite;
-            return null;
+            return Parent?.GetCroppedSprite(grade);
         }
 
         /// <summary>
-        /// Gets the config for a grade, falling back to grade 0 (DefaultLabel) if not found.
+        /// Gets the config for a grade, falling back to grade 0 (DefaultLabel) if not found, then to Parent.
         /// </summary>
         public GradedCardGradeConfig GetConfig(int grade)
         {
@@ -142,13 +143,72 @@ namespace GradedCardExpander
                 return config;
             if (Configs.TryGetValue(0, out var defaultConfig))
                 return defaultConfig;
-            return null;
+            return Parent?.GetConfig(grade);
         }
 
         /// <summary>
-        /// Returns true if this GradeAssets has any loaded assets.
+        /// Returns true if this GradeAssets has any loaded assets (textures or configs) or has a parent with assets.
         /// </summary>
-        public bool HasAssets => Textures.Count > 0;
+        public bool HasAssets => Textures.Count > 0 || Configs.Count > 0 || (Parent?.HasAssets ?? false);
+
+        /// <summary>
+        /// Logs all loaded assets to a file for debugging.
+        /// </summary>
+        public void LogToFile(string outputPath, string folderLabel)
+        {
+            using (var writer = new StreamWriter(outputPath, append: true))
+            {
+                writer.WriteLine($"=== GradeAssets: {folderLabel} ===");
+                writer.WriteLine($"FolderPath: {FolderPath}");
+                writer.WriteLine($"HasAssets: {HasAssets}");
+                writer.WriteLine();
+
+                writer.WriteLine($"Textures ({Textures.Count}):");
+                foreach (var kvp in Textures)
+                    writer.WriteLine($"  Grade {kvp.Key}: {kvp.Value?.name ?? "null"} ({kvp.Value?.width}x{kvp.Value?.height})");
+
+                writer.WriteLine($"Sprites ({Sprites.Count}):");
+                foreach (var kvp in Sprites)
+                    writer.WriteLine($"  Grade {kvp.Key}: {kvp.Value?.name ?? "null"}");
+
+                writer.WriteLine($"CroppedSprites ({CroppedSprites.Count}):");
+                foreach (var kvp in CroppedSprites)
+                    writer.WriteLine($"  Grade {kvp.Key}: {kvp.Value?.name ?? "null"}");
+
+                writer.WriteLine($"Configs ({Configs.Count}):");
+                foreach (var kvp in Configs)
+                {
+                    writer.WriteLine($"  Grade {kvp.Key}:");
+                    LogConfigSection(writer, "    GradeNumberText", kvp.Value.GradeNumberText);
+                    LogConfigSection(writer, "    GradeDescriptionText", kvp.Value.GradeDescriptionText);
+                    LogConfigSection(writer, "    GradeNameText", kvp.Value.GradeNameText);
+                    LogConfigSection(writer, "    GradeExpansionRarityText", kvp.Value.GradeExpansionRarityText);
+                    LogConfigSection(writer, "    GradeSerialText", kvp.Value.GradeSerialText);
+                }
+
+                writer.WriteLine();
+                writer.WriteLine(new string('-', 60));
+                writer.WriteLine();
+            }
+        }
+
+        private static void LogConfigSection(StreamWriter writer, string label, GradedCardTextConfig cfg)
+        {
+            if (cfg == null) { writer.WriteLine($"{label}: null"); return; }
+
+            var parts = new List<string>();
+            if (cfg.Color.HasValue) parts.Add($"Color={cfg.Color.Value}");
+            if (cfg.FontSize.HasValue) parts.Add($"FontSize={cfg.FontSize.Value}");
+            if (cfg.Position.HasValue) parts.Add($"Pos3D={cfg.Position.Value}");
+            if (cfg.Position2D.HasValue) parts.Add($"Pos2D={cfg.Position2D.Value}");
+            if (cfg.Font != null) parts.Add($"Font={cfg.Font.name}");
+            if (cfg.Text != null) parts.Add($"Text=\"{cfg.Text}\"");
+            if (cfg.OutlineColor.HasValue) parts.Add($"OutlineColor={cfg.OutlineColor.Value}");
+            if (cfg.OutlineWidth.HasValue) parts.Add($"OutlineWidth={cfg.OutlineWidth.Value}");
+            if (cfg.MaxTextWidthPixels.HasValue) parts.Add($"MaxWidth={cfg.MaxTextWidthPixels.Value}");
+
+            writer.WriteLine(parts.Count > 0 ? $"{label}: {string.Join(", ", parts)}" : $"{label}: (defaults)");
+        }
 
         private void LoadGrade(string folderPath, int grade, string baseName)
         {

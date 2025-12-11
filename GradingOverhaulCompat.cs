@@ -1,44 +1,55 @@
 using System;
 using System.Reflection;
+using HarmonyLib;
 
 namespace GradedCardExpander
 {
     internal static class GradingOverhaulCompat
     {
-        private static bool? _isAvailable;
-        private static Type _companyStampManagerType;
-        private static MethodInfo _tryGetCompanyMethod;
-
-        public static bool IsAvailable
+        public static int GetDisplayGrade(object cardData)
         {
-            get
+            if (cardData == null) return 0;
+
+            // 1. Get the Type (Same class as GetGradingCompany now!)
+            Type stampManager = AccessTools.TypeByName("TCGCardShopSimulator.GradingOverhaul.CompanyStampManager");
+            if (stampManager == null) return 0;
+
+            // 2. Get the Method
+            MethodInfo getGradeMethod = AccessTools.Method(stampManager, "GetDisplayGrade", new Type[] { cardData.GetType() });
+            if (getGradeMethod == null) return 0;
+
+            // 3. Invoke
+            try 
             {
-                if (_isAvailable == null)
-                {
-                    _companyStampManagerType = Type.GetType(
-                        "TCGCardShopSimulator.GradingOverhaul.CompanyStampManager, TCGCardShopSimulator.GradingOverhaul");
-                    _isAvailable = _companyStampManagerType != null;
-                    if (_isAvailable.Value)
-                    {
-                        _tryGetCompanyMethod = _companyStampManagerType.GetMethod(
-                            "TryGetCompany", BindingFlags.Public | BindingFlags.Static);
-                    }
-                }
-                return _isAvailable.Value;
+                return (int)getGradeMethod.Invoke(null, new object[] { cardData });
+            }
+            catch 
+            {
+                return 0;
             }
         }
-
-        public static bool TryGetCompany(object cardData, out string company)
+        public static string TryGetCompany(object cardData)
         {
-            company = null;
-            if (!IsAvailable || _tryGetCompanyMethod == null)
-                return false;
+            if (cardData == null) return "Vanilla";
 
-            object[] args = new object[] { cardData, null };
-            bool result = (bool)_tryGetCompanyMethod.Invoke(null, args);
-            if (result)
-                company = args[1]?.ToString();
-            return result;
+            // 1. Get the Type
+            Type stampManager = AccessTools.TypeByName("TCGCardShopSimulator.GradingOverhaul.CompanyStampManager");
+            if (stampManager == null) return "Vanilla";
+
+            // 2. Get the Method (No Enums or 'out' params needed now)
+            MethodInfo getMethod = AccessTools.Method(stampManager, "GetCompanyName", new Type[] { cardData.GetType() });
+            if (getMethod == null) return "Vanilla";
+
+            // 3. Invoke and return the result
+            // This will now return "PSA", "Beckett", etc., or "Vanilla" - never null.
+            try 
+            {
+                return (string)getMethod.Invoke(null, new object[] { cardData });
+            }
+            catch 
+            {
+                return "Vanilla";
+            }
         }
     }
 }

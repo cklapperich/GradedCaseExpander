@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>GradedCaseExpander</AssemblyName>
     <Product>GradedCaseExpander</Product>
-    <Version>1.3.0</Version>
+    <Version>1.3.3</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
     <RestoreAdditionalProjectSources>
@@ -39,6 +39,11 @@
     <Reference Include="TextureReplacer">
       <HintPath>lib\TextureReplacer.dll</HintPath>
     </Reference>
+    <Reference Include="Grading - Overhaul">
+      <HintPath>lib\Grading - Overhaul.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    
     <Compile Remove="references/**/*.cs" />
     <Compile Remove="reference_code/**/*.cs" />
     <Compile Remove="Generator/**/*.cs" />
